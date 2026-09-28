@@ -1,0 +1,111 @@
+
+This directory is intended for project specific (private) libraries.
+PlatformIO will compile them to static libraries and link into executable file.
+
+The source code of each library should be placed in a an own separate directory
+("lib/your_library_name/[here are source files]").
+
+For example, see a structure of the following two libraries `Foo` and `Bar`:
+
+|--lib
+|  |
+|  |--Bar
+|  |  |--docs
+|  |  |--examples
+|  |  |--src
+|  |     |- Bar.c
+|  |     |- Bar.h
+|  |  |- library.json (optional, custom build options, etc) https://docs.platformio.org/page/librarymanager/config.html
+|  |
+|  |--Foo
+|  |  |- Foo.c
+|  |  |- Foo.h
+|  |
+|  |- README --> THIS FILE
+|
+|- platformio.ini
+|--src
+   |- main.c
+
+and a contents of `src/main.c`:
+```
+#include <Foo.h>
+#include <Bar.h>
+
+int main (void)
+{
+  ...
+}
+
+```
+
+PlatformIO Library Dependency Finder will find automatically dependent
+libraries scanning project source files.
+
+More information about PlatformIO Library Dependency Finder
+- https://docs.platformio.org/page/librarymanager/ldf.html
+
+Rotary encoder action
+-Dashboard: dial up/down for select page,push long 3sec to MENU Mode
+-Check Box: push to toggle checked
+-Text Box: push to enter charector and next charactor,doble push(click) to Blackspace,dial up/down for select charactor,push long 3sec for Exit edit
+-Combo Box: push to exit,dial up/down for select item
+
+Display Dashboard MAP
+|STATISTICS
+
+
+Display Menu MAP
+|WiFi/BT/RF
+|-WiFi AP
+|-WiFi Client
+|-Blue Tooth
+|-RF Module
+
+|APRS
+|-APRS IGATE
+|  |-APRS-IS
+|  |-Position
+|  |-Filter
+|  |-Beacon
+
+|-APRS TRACKER
+|  |-Position
+|  |-Function
+|  |-Filter
+|  |-Smart Beacon
+
+|-DIGI REPEATER
+|  |-Position
+|  |-Function
+|  |-Filter
+
+|SYSTEM
+|-Save/Load
+|  |-Save Config
+|  |-Load Config
+|  |-Factore Reset
+|-OLED Display
+|-Monitor Popup
+|-ABOUT
+|  |-OTA Update
+|  |-WiFi Status
+|  |-Infomations
+|  |-Dash Board
+
+IGATE Mode support
+-Easy to select symbol icon
+-[RF2INET] RF to Internet gateway
+-[INET2RF] Internet to RF gateway
+-[POS2INET] Beacon Position to internet
+-[POS2RF] Beacon Position to radio
+-Support OBJECT name (use for multi station more SSID)
+-Support generate PHG (Height,TX Power,Gain,Antt direction)
+-Protect INET2RF packet not ax.25
+-Protect RF2INET packet from rf/inet to inet loop
+-Fix/GPS Position
+-One Symbol
+-Auto pass code
+
+DIGI Mode Support
+-Supoort PATH: WIDEn-N,TRACEn-N,RELAY,RFONLY,

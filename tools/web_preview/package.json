@@ -1,0 +1,13 @@
+{
+  "name": "web_preview",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Screenshots the live device's web UI for layout QA - see FORK_NOTES.md",
+  "scripts": {
+    "fetch": "./fetch_and_assemble.sh",
+    "shoot": "node screenshot_assembled.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

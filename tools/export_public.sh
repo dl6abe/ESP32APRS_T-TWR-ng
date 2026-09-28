@@ -29,9 +29,9 @@ if [ -z "$TARGET" ]; then
 fi
 
 # Files/dirs excluded from the public export beyond .gitignore, as decided
-# 2026-09-28: Claude Code instruction files, and this project's private
+# 2026-09-28/29: Claude Code instruction files, and this project's private
 # backlog/reasoning notes (kept only in the local/personal repo).
-EXCLUDES='^CLAUDE\.md$|^\.claude/|^Findings\.md$|^Findings_resolved\.md$'
+EXCLUDES='^CLAUDE\.md$|^\.claude/|^Findings\.md$|^Findings_resolved\.md$|^FORK_NOTES\.md$'
 
 mkdir -p "$TARGET"
 if [ ! -d "$TARGET/.git" ]; then

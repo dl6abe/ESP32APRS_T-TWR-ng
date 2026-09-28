@@ -1,9 +1,7 @@
 # Changelog
 
 All notable changes to this fork are documented here, newest first. This
-covers what changed for someone flashing/using the firmware — for the
-detailed technical reasoning behind each fix (root causes, what was tried
-and rejected, verification steps), see `FORK_NOTES.md`.
+covers what changed for someone flashing/using the firmware.
 
 ## stable-fork-v0.4 — since forking from upstream `V0.4`
 

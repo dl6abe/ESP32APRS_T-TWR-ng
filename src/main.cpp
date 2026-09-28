@@ -19,11 +19,7 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
-#include <BLESecurity.h>
+#include <NimBLEDevice.h>
 #include "XPowersLib.h"
 #include "cppQueue.h"
 #include "digirepeater.h"
@@ -173,8 +169,8 @@ TaskHandle_t taskGpsHandle;
 TaskHandle_t taskTNCHandle;
 
 HardwareSerial SerialGPS(2);
-BLEServer *pServer = NULL;
-BLECharacteristic *pTxCharacteristic;
+NimBLEServer *pServer = NULL;
+NimBLECharacteristic *pTxCharacteristic;
 bool BTdeviceConnected = false;
 bool BToldDeviceConnected = false;
 uint8_t BTtxValue = 0;
@@ -209,24 +205,26 @@ uint8_t BTtxValue = 0;
 //   }
 // };
 
-class MyServerCallbacks : public BLEServerCallbacks
+class MyServerCallbacks : public NimBLEServerCallbacks
 {
-  void onConnect(BLEServer *pServer)
+  void onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo)
   {
     BTdeviceConnected = true;
+    projLog(LOGCAT_BLUETOOTH, "BLE connected: %s", connInfo.getAddress().toString().c_str());
   };
 
-  void onDisconnect(BLEServer *pServer)
+  void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason)
   {
     BTdeviceConnected = false;
+    projLog(LOGCAT_BLUETOOTH, "BLE disconnected: %s (reason %d)", connInfo.getAddress().toString().c_str(), reason);
   }
 };
 
-class MyCallbacks : public BLECharacteristicCallbacks
+class MyCallbacks : public NimBLECharacteristicCallbacks
 {
-  void onWrite(BLECharacteristic *pCharacteristic)
+  void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo)
   {
-    std::string rxValue = pCharacteristic->getValue();
+    NimBLEAttValue rxValue = pCharacteristic->getValue();
 
     if (rxValue.length() > 0)
     {
@@ -245,11 +243,13 @@ class MyCallbacks : public BLECharacteristicCallbacks
       }
       if (config.bt_mode == 1)
       { // TNC2RAW MODE
+        projLog(LOGCAT_BLUETOOTH, "BLE RX TNC2RAW: %d bytes", (int)strlen(raw));
         pkgTxPush(raw, strlen(raw), 1);
       }
       else if (config.bt_mode == 2)
       {
         // KISS MODE
+        projLog(LOGCAT_BLUETOOTH, "BLE RX KISS: %d bytes", i);
         for (int n = 0; n < i; n++)
           kiss_serial((uint8_t)raw[n]);
       }
@@ -620,33 +620,40 @@ void setup()
   if (config.bt_master == true)
   {
     // Create the BLE Device
-    BLEDevice::init(config.bt_name);
-    // BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);  // The line you told me to add
-    // BLESecurity *pSecurity = new BLESecurity();
-    // pSecurity->setStaticPIN(config.bt_pin);
+    NimBLEDevice::init(config.bt_name);
+    // NimBLEDevice::setSecurityAuth(true, true, true);  // The line you told me to add
+    // NimBLEDevice::setSecurityPasskey(config.bt_pin);
 
     // Create the BLE Server
-    pServer = BLEDevice::createServer();
+    pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks());
 
     // Create the BLE Service
-    BLEService *pService = pServer->createService(config.bt_uuid);
+    NimBLEService *pService = pServer->createService(config.bt_uuid);
 
     // Create a BLE Characteristic
     pTxCharacteristic = pService->createCharacteristic(
         config.bt_uuid_tx,
-        BLECharacteristic::PROPERTY_NOTIFY);
-    pTxCharacteristic->addDescriptor(new BLE2902());
+        NIMBLE_PROPERTY::NOTIFY);
+    // NimBLE manages the CCCD (2902) descriptor for NOTIFY/INDICATE characteristics
+    // automatically - no manual addDescriptor() call needed (unlike Bluedroid's BLE2902).
 
-    BLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
+    NimBLECharacteristic *pRxCharacteristic = pService->createCharacteristic(
         config.bt_uuid_rx,
-        BLECharacteristic::PROPERTY_WRITE);
+        NIMBLE_PROPERTY::WRITE);
 
     // pRxCharacteristic->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM | ESP_GATT_PERM_WRITE_ENC_MITM);
     pRxCharacteristic->setCallbacks(new MyCallbacks());
 
-    // Start the service
-    pService->start();
+    // NimBLE starts services automatically when the server starts (pService->start() is a no-op here)
+
+    // Unlike the old Bluedroid-based BLE library, NimBLE-Arduino does not
+    // include the device name or service UUID in the advertisement by
+    // default (confirmed 2026-09-29: default advertisement was just the
+    // AD flags, "02 01 06" - phones couldn't find/identify the device).
+    // Must be set explicitly.
+    pServer->getAdvertising()->setName(config.bt_name);
+    pServer->getAdvertising()->addServiceUUID(config.bt_uuid);
 
     // Start advertising
     pServer->getAdvertising()->start();
@@ -1319,7 +1326,6 @@ void taskAPRS(void *pvParameters)
       newDigiPkg = true;
       if (config.bt_master)
       { // Output TNC2RAW to BT Serial
-        // SerialBT.println(tnc2);
         if (BTdeviceConnected)
         {
           if (config.bt_mode == 1)
@@ -1329,6 +1335,7 @@ void taskAPRS(void *pvParameters)
             pTxCharacteristic->setValue((uint8_t *)rawP, tnc2.length());
             pTxCharacteristic->notify();
             free(rawP);
+            projLog(LOGCAT_BLUETOOTH, "BLE TX TNC2RAW: %d bytes", (int)tnc2.length());
           }
           else if (config.bt_mode == 2)
           { // KISS
@@ -1336,13 +1343,13 @@ void taskAPRS(void *pvParameters)
             int sz = kiss_wrapper(pkg);
             pTxCharacteristic->setValue(pkg, sz);
             pTxCharacteristic->notify();
+            projLog(LOGCAT_BLUETOOTH, "BLE TX KISS: %d bytes", sz);
           }
         }
       }
 
       projLog(LOGCAT_APRS_RF, "RX: %s", tnc2.c_str());
 
-      // SerialBT.println(tnc2);
       uint16_t type = pkgType((char *)incomingPacket.info);
       char call[11];
       if (incomingPacket.src.ssid > 0)

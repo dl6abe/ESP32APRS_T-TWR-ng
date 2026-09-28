@@ -19,11 +19,6 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <WiFiClient.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
-#include <BLESecurity.h>
 #include "XPowersLib.h"
 #include "cppQueue.h"
 #include "digirepeater.h"

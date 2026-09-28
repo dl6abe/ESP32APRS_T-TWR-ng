@@ -146,7 +146,7 @@ Has been designed to be easy to use,By displaying results on the screen Configur
 - 1.Connect the USB cable to the LILYGO T-TWR Plus.
 - 2.Press the **PWR** button for one second to make sure the TWR is powered on
 - 3.Press and hold the **BOOT** button (without releasing it), then press the **RST** button, then release the **RST** button, and finally release the **BOOT** button
-- 4.[Download](https://github.com/nakhonthai/ESP32APRS_T-TWR/releases) firmware and open the program [ESP32 DOWNLOAD TOOL](https://www.espressif.com/en/support/download/other-tools), set it in the firmware upload program, set the firmware to ESP32APRS_TWR_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x0000 and boot_app0.bin at 0xe000
+- 4.[Download](https://gitea.aendes.de/andreas/ESP32APRS_T-TWR-ng/releases) firmware and open the program [ESP32 DOWNLOAD TOOL](https://www.espressif.com/en/support/download/other-tools), set it in the firmware upload program, set the firmware to ESP32APRS_TWR_Vxx.bin, location 0x10000 and partitions.bin at 0x8000 and bootloader.bin at 0x0000 and boot_app0.bin at 0xe000
 - 5.Click the **START** button in the program and wait for the upload to complete
 - 6.You can enter configuration mode in 3 ways:
 -   6.1 Use rotary switch + display direct config in the menu icon `SETTING`

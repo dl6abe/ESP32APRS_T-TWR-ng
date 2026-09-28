@@ -43,7 +43,7 @@ and rejected, verification steps), see `FORK_NOTES.md`.
 - USB-serial recovery console (`set wifi_ssid`/`set wifi_pass`/`save`) to
   recover a device that's become unreachable over WiFi.
 - Runtime-toggleable, per-category debug logging, with optional syslog
-  forwarding.
+  forwarding, now including a Bluetooth category.
 - The WiFi station list is now dynamic — add/remove up to 5 networks with
   "+"/delete buttons, instead of always showing 5 fixed slots.
 - Dashboard "Last Heard" callsigns are now clickable, linking to
@@ -80,3 +80,6 @@ and rejected, verification steps), see `FORK_NOTES.md`.
   label was fixed.
 - Fixed the boot-screen version text running off-screen.
 - Fixed broken image links (symbol icons, donate button).
+- Switched the Bluetooth LE stack from Bluedroid to NimBLE-Arduino,
+  reducing flash usage by roughly 365 KB (~18%) and RAM usage by ~18%
+  with no change in Bluetooth functionality.

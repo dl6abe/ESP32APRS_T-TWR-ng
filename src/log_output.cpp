@@ -60,6 +60,8 @@ static const char *categoryName(uint16_t category)
 		return "APRS_INET";
 	case LOGCAT_RF_MODULE:
 		return "RF_MODULE";
+	case LOGCAT_BLUETOOTH:
+		return "BLUETOOTH";
 	default:
 		return "LOG";
 	}

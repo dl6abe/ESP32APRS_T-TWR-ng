@@ -156,6 +156,7 @@ void handle_about()
 	webString += "<tr><td align=\"right\"><b>Wireguard client for LwIP: </b></td><td align=\"left\">1.0.1</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>QRCode: </b></td><td align=\"left\">0.0.1</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>EspSoftwareSerial: </b></td><td align=\"left\">8.2.0</td></tr>\n";
+	webString += "<tr><td align=\"right\"><b>NimBLE-Arduino: </b></td><td align=\"left\">2.5.1</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>LibAPRS_ESP32S3: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Adafruit GFX: </b></td><td align=\"left\">1.12.6 (vendored)</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>MenuSystem: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";

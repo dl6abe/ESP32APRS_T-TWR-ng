@@ -431,6 +431,8 @@ void handle_system()
 				config.logCategoryMask |= LOGCAT_APRS_INET;
 			else if (name == "logRfModule" && val == "OK")
 				config.logCategoryMask |= LOGCAT_RF_MODULE;
+			else if (name == "logBluetooth" && val == "OK")
+				config.logCategoryMask |= LOGCAT_BLUETOOTH;
 			else if (name == "syslogEnable" && val == "OK")
 				config.syslog_en = true;
 			else if (name == "syslogHost")
@@ -577,7 +579,8 @@ void handle_system()
 		html += "<label><input type=\"checkbox\" name=\"logGps\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_GPS) ? " checked" : "") + " /> GPS</label><br />\n";
 		html += "<label><input type=\"checkbox\" name=\"logAprsRf\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_RF) ? " checked" : "") + " /> APRS RF</label><br />\n";
 		html += "<label><input type=\"checkbox\" name=\"logAprsInet\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_INET) ? " checked" : "") + " /> APRS Internet</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logRfModule\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_RF_MODULE) ? " checked" : "") + " /> RF Module</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logRfModule\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_RF_MODULE) ? " checked" : "") + " /> RF Module</label><br />\n";
+		html += "<label><input type=\"checkbox\" name=\"logBluetooth\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_BLUETOOTH) ? " checked" : "") + " /> Bluetooth</label>\n";
 		html += "</td></tr>\n";
 		html += "<tr><td align=\"right\"><b>Syslog server:</b></td><td style=\"text-align: left;\">\n";
 		html += "<label><input type=\"checkbox\" name=\"syslogEnable\" value=\"OK\"" + String(config.syslog_en ? " checked" : "") + " /> Enable</label><br />\n";

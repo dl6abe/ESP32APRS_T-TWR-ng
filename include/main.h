@@ -111,6 +111,7 @@ void initVersion();
 #define LOGCAT_APRS_RF (1 << 3)  // AFSK/TNC/RF TX-RX
 #define LOGCAT_APRS_INET (1 << 4) // APRS-IS traffic
 #define LOGCAT_RF_MODULE (1 << 5) // SA868/SR_FRS radio module AT-command I/O (rf_module.cpp) - separate from LOGCAT_APRS_RF's packet TX/RX, this is the module control channel itself
+#define LOGCAT_BLUETOOTH (1 << 6) // BLE connect/disconnect and KISS/TNC2-over-BLE RX/TX (main.cpp's MyServerCallbacks/MyCallbacks)
 #define FILTER_THIRDPARTY (1 << 10) // packet is 3rd-party packet from INET2RF
 
 #define RF_NONE 0

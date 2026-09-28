@@ -1,4 +1,13 @@
-# ESP32APRS T-TWR Plus Project
+# ESP32APRS T-TWR Plus Project (`-ng` fork)
+
+This is `ESP32APRS_T-TWR-ng`, a fork of
+[nakhonthai/ESP32APRS_T-TWR](https://github.com/nakhonthai/ESP32APRS_T-TWR)
+that stays on the stable `V0.4` base — upstream's `V0.5` rewrite regressed
+badly (no TX/RX, reboot loops, display corruption; see
+[FORK_NOTES.md](FORK_NOTES.md)) and hasn't had a fix release in over a
+year — and continues fixing bugs and adding features forward from there.
+See [CHANGELOG.md](CHANGELOG.md) for what's changed, and
+[FORK_NOTES.md](FORK_NOTES.md) for the detailed reasoning behind each fix.
 
 ESP32APRS(T-TWR Plus) works in 3-modes: APRS internet gateway, digital repeater, tracker, with built-in TNC and radio transceiver. which is used with the ESP32-S3 LILYGO T-TWR Plus V2.0 board.
 
@@ -174,19 +183,23 @@ https://www.espressif.com/en/support/download/other-tools
 - APRS SERVER of T2THAI ampr host at [aprs.hs5tqa.ampr.org:14580](http://aprs.hs5tqa.ampr.org:14501)
 - APRS MAP SERVICE [http://aprs.nakhonthai.net](http://aprs.nakhonthai.net)
 
-## Donate
-
-To support the development of ESP32APRS you can make us a donation using [github sponsors](https://github.com/sponsors/nakhonthai). \
-If you want to donate some hardware to facilitate APRS porting and development, [contact us](https://www.facebook.com/atten). \
-[Donate via PayPal](https://www.paypal.me/hs5tqa)
-
 ## Credits & Reference
 
+**Original project:**
+- [nakhonthai/ESP32APRS_T-TWR](https://github.com/nakhonthai/ESP32APRS_T-TWR) — the upstream project this fork is based on (forked at tag `V0.4`)
 - Thank you for support device hardware chakphanu [E24OUW](https://github.com/chakphanu)
 - ESP32TNC project by amedes [ESP32TNC](https://github.com/amedes/ESP32TNC)
 - APRS Library by markqvist [LibAPRS](https://github.com/markqvist/LibAPRS)
 - Hardware & Software LILYGO [T-TWR](https://github.com/Xinyuan-LilyGO/T-TWR)
 - Online UUID Generator [UUID-Gen](https://www.uuidgenerator.net/)
+
+**Referenced while developing this fork** (see `FORK_NOTES.md` for what each was checked against):
+- [richonguzman/LoRa_APRS_iGate](https://github.com/richonguzman/LoRa_APRS_iGate) — display-timeout pattern, WiFi station list UI
+- [richonguzman/APRSPacketLib](https://github.com/richonguzman/APRSPacketLib) — compressed-position test vectors
+- [icssw-org/MeshCom-Firmware](https://github.com/icssw-org/MeshCom-Firmware) — ESP32-S3 USB-CDC console fix, aprs.fi callsign-link pattern
+- [llatva/npr-fw-freertos](https://github.com/llatva/npr-fw-freertos) — recovery console command syntax
+- [hessu/aprs-symbols](https://github.com/hessu/aprs-symbols) — color APRS symbol icon artwork
+- [nayarsystems/posix_tz_db](https://github.com/nayarsystems/posix_tz_db) — POSIX TZ string reference table
 
 ## LILYGO® T-TWR Plus
 I am not involved in any hardware development or trading. \

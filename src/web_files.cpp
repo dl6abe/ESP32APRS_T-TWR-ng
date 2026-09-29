@@ -43,13 +43,20 @@ void handle_storage()
 	//	setHTML(1);
 	uint8_t cardType = SD.cardType();
 
-	webString = "<table style=\"width:200px\">\n";
-	webString += "<th colspan=\"2\"><span><b>SD Card information</b></span></th>\n";
+	webString = "<div class=\"dash\">\n";
+	webString += "<div class=\"dash-section-title\">SD Card information</div>\n";
+	webString += "<div class=\"dash-panel\">\n";
+	webString += "<table style=\"width:200px\">\n";
 	webString += "<tr>\n";
 	webString += "<td align=\"right\"><b>SD CARD TYPE:</b></td><td>";
 	if (cardType == CARD_NONE)
 	{
-		webString += "NOT FOUND\n";
+		// Close the row/table/panel opened above - the "else" branch below
+		// closes these itself after appending its own card-size rows, but
+		// with no card there are no more rows to add before closing them.
+		webString += "NOT FOUND</td></tr>\n";
+		webString += "</table>\n";
+		webString += "</div>\n"; // .dash-panel
 	}
 	else
 	{
@@ -81,7 +88,11 @@ void handle_storage()
 		webString += "<tr><td style=\"width: 60px;text-align: right;\"><b>Used space: </b></td><td style=\"text-align: right;\">";
 		webString += String((unsigned long)cardUsed) + "M</td></tr>\n";
 
-		webString += "</table><br /><br /><h2>Listing directory: " + dirname + "</h2><br />\n";
+		webString += "</table>\n";
+		webString += "</div>\n"; // .dash-panel
+
+		webString += "<div class=\"dash-section-title\">Listing directory: " + dirname + "</div>\n";
+		webString += "<div class=\"dash-panel\">\n";
 
 		File root = SD.open(dirname);
 		if (!root)
@@ -128,10 +139,11 @@ void handle_storage()
 			}
 			file = root.openNextFile();
 		}
-		webString += "</table>";
+		webString += "</table>\n";
+		webString += "</div>\n"; // .dash-panel
 	}
 
-	// webString += "</br><div><a href=\"/file?SD_INIT=OK\">[SD INIT]</a></div> \n";
+	webString += "</div>\n"; // .dash
 	server.send(200, "text/html", webString); // send to someones browser when asked
 }
 
@@ -242,7 +254,7 @@ void handle_delete()
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 {
-	Serial.printf("Listing directory: %s\n", dirname);
+	Serial.printf("Listing directory: %s\r\n", dirname);
 
 	File root = fs.open(dirname);
 	if (!root)
@@ -265,7 +277,7 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 			Serial.print(file.name());
 			time_t t = file.getLastWrite();
 			struct tm *tmstruct = localtime(&t);
-			Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
+			Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\r\n", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
 			if (levels)
 			{
 				listDir(fs, file.name(), levels - 1);
@@ -279,7 +291,7 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 			Serial.print(file.size());
 			time_t t = file.getLastWrite();
 			struct tm *tmstruct = localtime(&t);
-			Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
+			Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\r\n", (tmstruct->tm_year) + 1900, (tmstruct->tm_mon) + 1, tmstruct->tm_mday, tmstruct->tm_hour, tmstruct->tm_min, tmstruct->tm_sec);
 		}
 		file = root.openNextFile();
 	}

@@ -128,7 +128,9 @@ void handle_symbol_icon()
 void handle_symbol()
 {
 	int i;
-	String html = "<table border=\"1\" align=\"center\">\n";
+	String html = "<div class=\"dash\">\n";
+	html += "<div class=\"dash-panel\">\n";
+	html += "<table>\n";
 	html += "<tr><th colspan=\"16\">Table '/'</th></tr>\n";
 	html += "<tr>\n";
 	for (i = 33; i < 129; i++)
@@ -138,8 +140,8 @@ void handle_symbol()
 			html += "</tr>\n<tr>\n";
 	}
 	html += "</tr>";
-	html += "</table>\n<br />";
-	html += "<table border=\"1\" align=\"center\">\n";
+	html += "</table>\n";
+	html += "<table>\n";
 	html += "<tr><th colspan=\"16\">Table '\\'</th></tr>\n";
 	html += "<tr>\n";
 	for (i = 33; i < 129; i++)
@@ -150,6 +152,8 @@ void handle_symbol()
 	}
 	html += "</tr>";
 	html += "</table>\n";
+	html += "</div>\n"; // .dash-panel
+	html += "</div>\n"; // .dash
 	server.send(200, "text/html", html); // send to someones browser when asked
 }
 
@@ -202,7 +206,10 @@ void handle_lastHeard()
 	sort(pkgList, PKGLISTSIZE);
 
 	html = "<table>\n";
-	html += "<th colspan=\"7\" style=\"background-color: #070ac2;\">LAST HEARD</th>\n";
+	// No inline background here (was a hardcoded #070ac2 that clashed with the
+	// dashboard's accent blue) - inherits .dash table th's background so this
+	// title row and the column-header row below it are the same blue.
+	html += "<th colspan=\"8\">LAST HEARD</th>\n";
 	html += "<tr>\n";
 	html += "<th style=\"min-width:10ch\"><span><b>Time (";
 	if (config.timeZone >= 0)
@@ -220,9 +227,13 @@ void handle_lastHeard()
 	html += "<th style=\"min-width:5ch\">DX</th>\n";
 	html += "<th style=\"min-width:5ch\">PACKET</th>\n";
 	html += "<th style=\"min-width:5ch\">AUDIO</th>\n";
+	html += "<th>COMMENT</th>\n";
 	html += "</tr>\n";
 
-	for (int i = 0; i < 30; i++)
+	// PKGLISTSIZE (main.h), not a hardcoded 30 - the underlying pkgList
+	// already retains this many heard packets (100 with PSRAM, 10 without),
+	// the table was just never showing more than the first 30 of them.
+	for (int i = 0; i < PKGLISTSIZE; i++)
 	{
 		pkgListType pkg = getPkgList(i);
 		if (pkg.time > 0)
@@ -348,21 +359,37 @@ void handle_lastHeard()
 					html += "<td>" + String(packet) + "</td>\n";
 					if (pkg.audio_level == 0)
 					{
-						html += "<td>-</td></tr>\n";
+						html += "<td>-</td>\n";
 					}
 					else
 					{
 						//Vp-p to dBV at http://earmark.net/gesr/opamp/db_calc.htm
 						double Vrms = (double)pkg.audio_level / 1000;
 						double audBV = 20.0F * log10(Vrms);
-						if(audBV<-15.0F){ 
+						if(audBV<-15.0F){
 							html += "<td style=\"color: #0000f0;\">"; //Low wave amplitude <0.5Vp-p
-						}else if(audBV>-4.0F){ 
+						}else if(audBV>-4.0F){
 							html += "<td style=\"color: #f00000;\">"; //High wave amplitude >1.8Vp-p
 						}else{
 							html += "<td style=\"color: #008000;\">";
 						}
-						html += String(audBV, 1) + "dBV</td></tr>\n";
+						html += String(audBV, 1) + "dBV</td>\n";
+					}
+					// aprs.comment points into aprs.data (not its own
+					// null-terminated buffer), bounded by comment_len - copy
+					// into a fixed buffer the same way srcname/itemname does
+					// above, and escape it since it's attacker-controlled
+					// (RF/APRS-IS packet content, see escapeHtml()'s comment).
+					if (aprs.comment_len > 0 && aprs.comment_len < 200)
+					{
+						char commentBuf[200];
+						memset(commentBuf, 0, sizeof(commentBuf));
+						memcpy(commentBuf, aprs.comment, aprs.comment_len);
+						html += "<td style=\"text-align: left;white-space:normal;max-width:280px;\">" + escapeHtml(String(commentBuf)) + "</td></tr>\n";
+					}
+					else
+					{
+						html += "<td>-</td></tr>\n";
 					}
 				}
 			}

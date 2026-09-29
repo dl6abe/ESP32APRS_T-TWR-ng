@@ -142,7 +142,7 @@ void defaultConfig()
   sprintf(config.igate_symbol, "/&");
   config.igate_object[0] = 0;
   config.igate_phg[0] = 0;
-  config.igate_path = 8;
+  config.igate_path = PATH_DEFAULT_FIXED; // WIDE1-1
   sprintf(config.igate_comment, "IGate MODE");
 
   // DIGI REPEATER
@@ -152,7 +152,7 @@ void defaultConfig()
   config.digi_ssid = 3;
   config.digi_timestamp = false;
   sprintf(config.digi_mycall, "NOCALL");
-  config.digi_path = 8;
+  config.digi_path = PATH_DEFAULT_FIXED; // WIDE1-1
   //--Position
   config.digi_gps = false;
   config.digi_lat = 13.7555;
@@ -175,7 +175,7 @@ void defaultConfig()
   config.trk_ssid = 7;
   config.trk_timestamp = false;
   sprintf(config.trk_mycall, "NOCALL");
-  config.trk_path = 2;
+  config.trk_path = PATH_DEFAULT_MOBILE; // WIDE1-1,WIDE2-1
 
   //--Position
   config.trk_gps = false;
@@ -183,6 +183,8 @@ void defaultConfig()
   config.trk_lon = 100.4930;
   config.trk_alt = 0;
   config.trk_interval = 600;
+  // SmartTracker (issue #31) - opt-in, off by default
+  config.trk_smarttracker = false;
   // Smart beacon
   config.trk_smartbeacon = true;
   config.trk_compress = true;

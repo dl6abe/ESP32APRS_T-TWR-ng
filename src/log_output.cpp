@@ -21,6 +21,22 @@
 static WiFiUDP syslogUdp;
 static Syslog *syslogClient = nullptr;
 static SemaphoreHandle_t syslogMutex = nullptr;
+// Guards Serial.printf() in projLog() - found 2026-09-29 live on hardware:
+// taskAPRS/taskNetwork/etc. all call projLog() with no synchronization on
+// the shared Serial (HWCDC) output, so concurrent calls interleave
+// mid-line (one line's text gets overwritten/merged with another's before
+// its own trailing '\n'). Same class of bug as the aprsClient data race
+// (commit 0dd1336) and the display I2C race (commit 6fc993c) - this is
+// the Serial-output instance of the same "no lock around a shared
+// peripheral accessed from multiple tasks" pattern.
+static SemaphoreHandle_t serialMutex = nullptr;
+
+// Must be called once from setup(), before any task that logs is created -
+// see aprsClientMutex's init in main.cpp for the same pattern/reasoning.
+void logInit()
+{
+	serialMutex = xSemaphoreCreateMutex();
+}
 
 // (Re)creates the Syslog client from current config - call once at boot
 // (after loading config) and again any time config.syslog_* is saved from
@@ -80,7 +96,25 @@ void projLog(uint16_t category, const char *fmt, ...)
 	vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
 
-	Serial.printf("[%s] %s\n", categoryName(category), msg);
+	xSemaphoreTake(serialMutex, portMAX_DELAY);
+	// \r\n, not just \n, matching consolePoll()'s convention - without the
+	// \r a terminal that doesn't auto-translate LF->CRLF moves down a line
+	// but stays at the same column, producing a "staircase" of merged
+	// lines. Found live on hardware 2026-09-29 (user report).
+	//
+	// Trailing \r\n only, no leading one: projLog() fires far more often
+	// than consolePoll()'s one-off command responses (which do lead with
+	// \r\n as a deliberate visual separator), so a leading \r\n here
+	// produced a blank line before every single log entry - same class of
+	// double-newline bug as commit 6448d4c, found live 2026-09-29 when
+	// this exact leading \r\n was tried and reverted.
+	Serial.printf("[%s] %s\r\n", categoryName(category), msg);
+	xSemaphoreGive(serialMutex);
+
+	// Third sink, same category-filtered msg as Serial/syslog above - see
+	// web_console.cpp. No-op (single bool check) unless a user has started
+	// recording from the web UI's Console tab.
+	consoleLogAppend(categoryName(category), msg);
 
 	if (syslogClient != nullptr && syslogMutex != nullptr)
 	{

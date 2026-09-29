@@ -23,8 +23,25 @@
 
 String escapeHtml(const String &input); // web_symbols.cpp - escape before concatenating any user/RF-sourced string into HTML
 
-#define PATH_LEN 17
-const char PATH_NAME[PATH_LEN][15] = {"OFF", "DST-TRACE 1", "DST-TRACE 2", "DST-TRACE 3", "DST-TRACE 4", "TRACE1-1", "TRACE2-2", "TRACE3-3", "WIDE1-1","RFONLY","RELAY","GATE","ECHO","UserDefine 1","UserDefine 2","UserDefine 3","UserDefine 4"};
+// "DST-TRACE 1-4" (-> literal "DST1".."DST4") and "ECHO" removed 2026-09-29 -
+// not documented anywhere as real APRS digipeater aliases (checked against
+// the APRS spec's New-N-Paradigm addendum and community references); no
+// digipeater would ever act on them, so packets sent with these "paths"
+// were only ever heard directly. Added "WIDE1-1,WIDE2-1" as a real preset -
+// previously the actually-recommended default path only existed as
+// UserDefine-2's factory-default *text*, not as a selectable system entry
+// (see Gitea issue - Path Definition discussion).
+//
+// Indices are stored directly in config.igate_path/digi_path/trk_path
+// (uint8_t), so removing/reordering entries shifts what an already-saved
+// index points to - reselect the Path dropdown on iGate/DIGI/Tracker once
+// after upgrading. Not worth a migration shim for a single hand-flashed
+// unit; revisit if this ever needs to survive an OTA update to deployed
+// hardware.
+#define PATH_LEN 13
+#define PATH_DEFAULT_FIXED 4  // WIDE1-1 - recommended default for iGate/DIGI (fixed infrastructure, single hop)
+#define PATH_DEFAULT_MOBILE 5 // WIDE1-1,WIDE2-1 - recommended default for Tracker (mobile, New-N-Paradigm)
+const char PATH_NAME[PATH_LEN][20] = {"OFF", "TRACE1-1", "TRACE2-2", "TRACE3-3", "WIDE1-1", "WIDE1-1,WIDE2-1", "RFONLY", "RELAY", "GATE", "UserDefine 1", "UserDefine 2", "UserDefine 3", "UserDefine 4"};
 
 // ใช้ตัวแปรโกลบอลในไฟล์ main.cpp
 extern SA868 sa868;
@@ -97,8 +114,12 @@ void handle_vpn();
 void handle_igate();
 void handle_digi();
 void handle_tracker();
+void handle_trackerSendBeacon(); // web_tracker.cpp - manual "Send Beacon Now" button on the Dashboard
 void handle_wireless();
 void handle_realtime();
 void handle_about();
+void handle_htmx_js(); // web_assets.cpp - vendored htmx.min.js, served standalone (no internet needed)
+void handle_console();    // web_console.cpp - Console tab page + start/stop toggle
+void handle_consoleLog(); // web_console.cpp - GET: raw text/plain snapshot of the recording buffer
 
 #endif

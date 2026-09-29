@@ -144,14 +144,32 @@ float ParseAPRS::filter_lon2rad(float lon)
 
 int ParseAPRS::is_number(char const *input)
 {
-	int i;
+	// Was previously unconditionally rejecting any leading '-'/'+' (the
+	// isdigit() check alone already fails on a sign character, making the
+	// explicit "reject at position 0" clause dead-but-redundant rather than
+	// the intended "allow one leading sign" - so this never accepted a
+	// negative number, e.g. a weather report's "-07" (degrees F, spec's own
+	// documented negative-temperature form) was silently treated as
+	// "not a number" and the decoded value was dropped.
+	size_t i;
+	size_t len;
 
 	if (!input)
 		return 0;
 
-	for (i = 0; i < strlen(input); ++i)
+	len = strlen(input);
+	if (len == 0)
+		return 0;
+
+	i = 0;
+	if (input[0] == '-' || input[0] == '+')
+		i = 1;
+	if (i >= len) // sign with no digits after it
+		return 0;
+
+	for (; i < len; ++i)
 	{
-		if (!isdigit(input[i]) || (i == 0 && (input[i] == '-' || input[i] == '+')))
+		if (!isdigit(input[i]))
 			return 0;
 	}
 	return 1;
@@ -1271,6 +1289,29 @@ int ParseAPRS::parse_aprs_compressed(struct pbuf_t *pb, const char *body, const 
 		return pbuf_fill_pos(pb, lat, lng, sym_table, sym_code);
 	}
 
+	// Weather-report detection - same rule as parse_aprs_uncompressed()
+	// (spec ch.12: identified by the weather symbol code '_', with "wind
+	// gust immediately followed by temperature" as a safety net before
+	// actually treating it as weather data). This compressed-position path
+	// used to always fall through to parse_aprs_comment() regardless of
+	// sym_code, so a compressed-position weather report's whole
+	// "g...t073h00b06925..." data block came out raw, undecoded, in the
+	// comment. Found live 2026-09-29 (DK6GC-10, DL0BB-10, both
+	// compressed-position weather stations).
+	{
+		char *rest = (char *)body + 13;
+		char *wx = strchr(rest, 'g');
+		if ((sym_code == '_' || rest[0] == 'g') && wx)
+		{
+			wx += 4;
+			if (*wx == 't')
+			{
+				parse_aprs_wx(pb, body + 13, (unsigned int)(body_end - body - 13));
+				return pbuf_fill_pos(pb, lat, lng, sym_table, sym_code);
+			}
+		}
+	}
+
 	parse_aprs_comment(pb, body + 13, (unsigned int)(body_end - body - 13));
 	return pbuf_fill_pos(pb, lat, lng, sym_table, sym_code);
 }
@@ -1367,8 +1408,20 @@ int ParseAPRS::parse_aprs_uncompressed(struct pbuf_t *pb, const char *body, cons
 	// 	lng_deg, lng_min, lng_min_frag, (int)lng_hemi, lng);
 	// fprintf(stderr, "\tsym '%c' '%c'\n", sym_table, sym_code);
 	char *rest = (char *)body + 19;
-	// if (sym_code == '_') {
-	if (((rest[3] == '/') || (rest[0] == 'c')))
+	// Weather-report detection: spec (ch.12) says this is identified by the
+	// weather symbol code '_' - added that check back in alongside the
+	// pre-existing heuristics (wind dir/speed "nnn/sss" prefix, or a
+	// lone leading 'c') rather than replacing them, since some real
+	// devices (seen live 2026-09-29: DL0BB-10, DK6GC-10, DL9CN-10, all
+	// "LoRa APRS.../WX Station" style) send weather data with *no* wind
+	// direction/speed field at all - straight from the symbol into
+	// "g...t...", which matched none of the old conditions and fell
+	// through to parse_aprs_comment() instead, so the whole weather data
+	// block showed up raw in the comment. The inner check just below
+	// (gust immediately followed by temperature) still has to confirm
+	// this genuinely looks like weather data before parse_aprs_wx() runs,
+	// same safety net as before.
+	if ((rest[3] == '/') || (rest[0] == 'c') || (rest[0] == 'g') || (sym_code == '_'))
 	{
 		char *wx = strchr(rest, 'g');
 		if (wx)
@@ -1654,7 +1707,36 @@ int ParseAPRS::parse_aprs(struct pbuf_t *pb)
 			rc = parse_aprs_mice(pb, (const unsigned char *)body, (const unsigned char *)body_end);
 			int len = (int)(body_end - body - 9);
 			if (len > 0)
-				parse_aprs_comment(pb, body + 9, (unsigned int)len);
+			{
+				const char *rest = body + 9;
+				unsigned int rest_len = (unsigned int)len;
+				// Mic-E altitude extension (spec ch.10): 3 base91 digits + '}'
+				// immediately at the front of the status text - a different
+				// encoding from the ASCII "/A=nnnnnn" extension
+				// parse_aprs_comment() already handles for other packet
+				// types. Decoded here (Mic-E-specific), not inside
+				// parse_aprs_comment() itself, which every packet type
+				// shares - a generic "3 chars + }" check there would
+				// false-positive on ordinary comment text. Found live
+				// 2026-09-29 (user report): the raw, undecoded "xyz}" bytes
+				// leaked into the comment ahead of the real status text
+				// (e.g. a frequency spec + free text), altitude was lost.
+				if (rest_len >= 4 && rest[3] == '}' &&
+					(unsigned char)rest[0] >= 0x21 && (unsigned char)rest[0] <= 0x7b &&
+					(unsigned char)rest[1] >= 0x21 && (unsigned char)rest[1] <= 0x7b &&
+					(unsigned char)rest[2] >= 0x21 && (unsigned char)rest[2] <= 0x7b)
+				{
+					long alt_raw = (((long)(rest[0] - 33) * 91L) + (rest[1] - 33)) * 91L + (rest[2] - 33);
+					pb->altitude = (double)(alt_raw - 10000); // meters, per spec
+					pb->flags |= F_ALT;
+					unsigned int tmp_us;
+					char *tmp_str = parse_remove_part(rest, rest_len, 0, 4, &tmp_us);
+					rest = tmp_str;
+					rest_len = tmp_us;
+				}
+				if (rest_len > 0)
+					parse_aprs_comment(pb, rest, rest_len);
+			}
 			DEBUG_LOG("MICE\n");
 			return rc;
 		}
@@ -2124,10 +2206,65 @@ int ParseAPRS::parse_aprs_wave(struct pbuf_t *pb, char const *input, unsigned in
 	return 1;
 }
 
+// Consumes one optional Weather Report data field (APRS spec 1.2c ch.12,
+// "Weather Data": gggg/tttt/rrrr/pppp/PPPP/hhh/bbbbbb, plus the non-standard
+// but commonly-seen luminosity/UV fields this parser has always recognized)
+// from the *front* of *rest only - not found anywhere later in the string.
+// That distinction is the whole point: the old code did
+// `strchr(rest, letter)`, which searches the entire remaining text every
+// time, including whatever free-text comment follows the weather block. A
+// comment like "Wetterstation" contains both 't' and 'r'; searching for
+// those letters anywhere happily "found" a fake temperature/rain field
+// inside an ordinary word and chewed several characters out of it. Per
+// spec, the optional fields are packed back-to-back immediately after the
+// mandatory wind/gust/temp fields with *no* delimiter before the free-text
+// comment that may follow - so the only way to correctly find "where the
+// weather data ends" is to keep matching from the front and stop at the
+// first thing that doesn't look like a field.
+//
+// A field only matches if `letter` is immediately followed by (width-1)
+// bytes that are all digits (leading '-' allowed, for negative temperature)
+// or all '.'/' ' - the spec's own placeholder convention for "value
+// unknown" ("its value may be expressed as a series of dots or spaces").
+// Anything else after the letter (e.g. ordinary text) means this isn't
+// really a field, so it's left alone for the caller to treat as comment.
+bool ParseAPRS::wx_take_field(char **rest, unsigned int *rest_len, char letter, int width, char *out, size_t out_len)
+{
+	if (!*rest || *rest_len < (unsigned int)width || (*rest)[0] != letter)
+		return false;
+
+	for (int i = 1; i < width; i++)
+	{
+		char c = (*rest)[i];
+		bool digitOk = isdigit((unsigned char)c) || (i == 1 && c == '-');
+		bool placeholderOk = (c == '.' || c == ' ');
+		if (!digitOk && !placeholderOk)
+			return false;
+	}
+
+	size_t valLen = (size_t)(width - 1);
+	if (valLen > out_len - 1)
+		valLen = out_len - 1;
+	memcpy(out, *rest + 1, valLen);
+	out[valLen] = 0;
+
+	unsigned int newLen;
+	*rest = parse_remove_part(*rest, *rest_len, 0, (unsigned int)width, &newLen);
+	*rest_len = newLen;
+	return true;
+}
+
 int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int const input_len)
 {
 	int flage = 0;
-	static char wind_dir[4], wind_speed[4], wind_gust[4], temperature[4], rain[4], rain24[4], rainMn[4], humidity[3], barometric[6], luminosity[4], uv[3];
+	// Not `static`: these used to be, which meant a field absent from *this*
+	// packet silently kept whichever value a *previous* call had left behind
+	// (e.g. a report with no rain field would inherit "rain=000" - or worse,
+	// some non-zero leftover - from the last packet that did have one,
+	// fabricating a W_R1H flag and value that were never actually
+	// transmitted). Every buffer below is explicitly zeroed a few lines down
+	// specifically to prevent this.
+	char wind_dir[4], wind_speed[4], wind_gust[4], temperature[4], rain[4], rain24[4], rainMn[4], humidity[3], barometric[6], luminosity[4], uv[3];
 	bool luminosityAbove = false;
 	char *rest = NULL, *tmp_str;
 	unsigned int rest_len, tmp_us;
@@ -2141,6 +2278,13 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	/* Initialize result vars. */
 	memset(wind_dir, 0, 4);
 	memset(wind_speed, 0, 4);
+	memset(wind_gust, 0, 4);
+	memset(temperature, 0, 4);
+	memset(rain, 0, 4);
+	memset(rain24, 0, 4);
+	memset(rainMn, 0, 4);
+	memset(humidity, 0, 3);
+	memset(barometric, 0, 6);
 	memset(luminosity, 0, 4);
 	memset(uv, 0, 3);
 
@@ -2161,129 +2305,62 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	}
 	else
 	{
-		if ((tmp_str = strchr(rest, 'c')))
-		{
-			memcpy(wind_dir, tmp_str + 1, 3);
-			wind_dir[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
+		// Front-anchored, like every other optional field below (see
+		// wx_take_field()'s comment) - the old strchr(rest, letter) here
+		// searched the *entire* remaining text, including any free-text
+		// comment that follows, so a comment containing a bare 's' (e.g.
+		// "Wetterstation") had 4 bytes silently chewed out of it
+		// ("Wetterstation" -> "Wetterion"). This is the compressed-weather
+		// course/speed prefix ("cDDDsSSS..."), which per spec only ever
+		// appears immediately after the position, never deeper in the
+		// comment.
+		if (wx_take_field(&rest, &rest_len, 'c', 4, wind_dir, sizeof(wind_dir)))
 			flage++;
-		}
-		if ((tmp_str = strchr(rest, 's')))
-		{
-			memcpy(wind_speed, tmp_str + 1, 3);
-			wind_speed[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
-		}
+		if (wx_take_field(&rest, &rest_len, 's', 4, wind_speed, sizeof(wind_speed)))
+			flage++;
 	}
 
-	if ((tmp_str = strchr(rest, 'g')))
+	// Optional Weather Report fields - "may be in a different order, or may
+	// not even exist" (APRS 1.2c ch.12), packed back-to-back with no
+	// delimiter before whatever free-text comment follows. Keep matching
+	// from the current front of `rest` for any known field marker; stop the
+	// instant nothing matches, since that's where the real weather data
+	// ends and comment text begins. See wx_take_field()'s comment for why
+	// this replaced the old strchr(rest, letter)-anywhere-in-string version.
+	bool matched;
+	do
 	{
-		memcpy(wind_gust, tmp_str + 1, 3);
-		wind_gust[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if ((tmp_str = strchr(rest, 't')))
-	{
-		memcpy(temperature, tmp_str + 1, 3);
-		temperature[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if ((tmp_str = strchr(rest, 'r')))
-	{
-		memcpy(rain, tmp_str + 1, 3);
-		rain[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if ((tmp_str = strchr(rest, 'p')))
-	{
-		memcpy(rain24, tmp_str + 1, 3);
-		rain24[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-	if ((tmp_str = strchr(rest, 'P')))
-	{
-		memcpy(rainMn, tmp_str + 1, 3);
-		rainMn[3] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if ((tmp_str = strchr(rest, 'h')))
-	{
-		memcpy(humidity, tmp_str + 1, 2);
-		humidity[2] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-	if ((tmp_str = strchr(rest, 'b')))
-	{
-		memcpy(barometric, tmp_str + 1, 5);
-		barometric[5] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 6, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
-
-	if ((tmp_str = strchr(rest, 'l')))
-	{
-		memcpy(luminosity, tmp_str + 1, 3);
-		if (is_number(luminosity))
+		matched = false;
+		if (wx_take_field(&rest, &rest_len, 'g', 4, wind_gust, sizeof(wind_gust)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 't', 4, temperature, sizeof(temperature)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'r', 4, rain, sizeof(rain)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'p', 4, rain24, sizeof(rain24)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'P', 4, rainMn, sizeof(rainMn)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'h', 3, humidity, sizeof(humidity)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'b', 6, barometric, sizeof(barometric)))
+			matched = true;
+		else if (wx_take_field(&rest, &rest_len, 'l', 4, luminosity, sizeof(luminosity)))
 		{
 			luminosityAbove = true;
-			luminosity[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
-			flage++;
+			matched = true;
 		}
-	}
-	if ((tmp_str = strchr(rest, 'L')))
-	{
-		memcpy(luminosity, tmp_str + 1, 3);
-		if (is_number(luminosity))
+		else if (wx_take_field(&rest, &rest_len, 'L', 4, luminosity, sizeof(luminosity)))
 		{
 			luminosityAbove = false;
-			luminosity[3] = 0;
-			tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 4, &tmp_us);
-			rest = tmp_str;
-			rest_len = tmp_us;
-			flage++;
+			matched = true;
 		}
-	}
+		else if (wx_take_field(&rest, &rest_len, 'u', 3, uv, sizeof(uv)))
+			matched = true;
 
-	if ((tmp_str = strchr(rest, 'u')))
-	{
-		memcpy(uv, tmp_str + 1, 2);
-		uv[2] = 0;
-		tmp_str = parse_remove_part(rest, rest_len, tmp_str - rest, tmp_str - rest + 3, &tmp_us);
-		rest = tmp_str;
-		rest_len = tmp_us;
-		flage++;
-	}
+		if (matched)
+			flage++;
+	} while (matched && rest);
 
 	// packet->format = fapPOS_WX;
 	/* Save values. */
@@ -2329,7 +2406,10 @@ int ParseAPRS::parse_aprs_wx(struct pbuf_t *pb, char const *input, unsigned int 
 	if (is_number(humidity))
 	{
 		pb->wx_report.flags |= W_HUM;
-		pb->wx_report.humidity = atoi(humidity);
+		// Spec (ch.12): humidity is two digits, 01-99 - "00" is reserved to
+		// mean 100%, since the field can't otherwise encode it.
+		int hum = atoi(humidity);
+		pb->wx_report.humidity = (hum == 0) ? 100 : hum;
 	}
 
 	/* Pressure. */
@@ -2495,9 +2575,15 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 			pb->altitude = (double)(tmp_s * FT_TO_M);
 			pb->flags |= F_ALT;
 
-			/* Remove altitude. */
-			rest = (char *)res + 9;
-			rest_len = rest_len - 9;
+			/* Remove altitude only, keeping whatever comment text comes
+			   before and after it - "rest = res + 9" (the old code) dropped
+			   everything *before* the "/A=nnnnnn" marker instead of just
+			   excising the marker itself, so any real comment text ahead of
+			   an altitude extension (a very common ordering, e.g.
+			   "<comment>/A=000666") was silently discarded. */
+			tmp_str = parse_remove_part(rest, rest_len, res - rest, res - rest + 9, &tmp_us);
+			rest = tmp_str;
+			rest_len = tmp_us;
 		}
 	}
 
@@ -2531,7 +2617,10 @@ int ParseAPRS::parse_aprs_comment(struct pbuf_t *pb, char const *input, unsigned
 	/*fapint_parse_comment_telemetry(packet, &rest, &rest_len);*/
 
 	/* If there's something left, save it as a comment. */
-	rest_len = strlen(rest);
+	// rest can come back NULL from parse_remove_part() above if stripping an
+	// extension consumed the entire remaining text (e.g. a comment that is
+	// nothing but "/A=nnnnnn") - strlen(NULL) would crash.
+	rest_len = rest ? strlen(rest) : 0;
 	if (rest_len > 0)
 	{
 		pb->comment = rest;

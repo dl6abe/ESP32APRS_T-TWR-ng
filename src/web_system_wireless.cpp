@@ -476,61 +476,40 @@ void handle_system()
 		html += "});\n";
 		html += "</script>\n";
 
-		// html += "<h2>System Setting</h2>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>System Setting</b></span></th>\n";
-		html += "<tr>";
-		// html += "<form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTime\" method=\"post\">\n";
-		html += "<td style=\"text-align: right;\">LOCAL<br/>DATE/TIME </td>\n";
-		html += "<td style=\"text-align: left;\"><br /><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTime\" method=\"post\">\n<input name=\"SetTime\" type=\"text\" value=\"" + String(strTime) + "\" />\n";
-		html += "<span class=\"input-group-addon\">\n<span class=\"glyphicon glyphicon-calendar\">\n</span></span>\n";
-		// html += "<div class=\"col-sm-3 col-xs-6\"><button class=\"btn btn-primary\" data-args=\"[true]\" data-method=\"getDate\" type=\"button\" data-related-target=\"#SetTime\" />Get Date</button></div>\n";
-		html += "<button type='submit' id='updateTime'  name=\"commit\"> Time Update </button>\n";
-		html += "<input type=\"hidden\" name=\"updateTime\"/></form>\n</td>\n";
-		// html += "<input class=\"btn btn-primary\" id=\"updateTime\" name=\"updateTime\" type=\"submit\" value=\"Time Update\" maxlength=\"80\"/></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash\">\n";
+		html += "<div class=\"dash-section-title\">System Setting</div>\n";
+		html += "<div class=\"dash-panel\">\n";
 
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">NTP Host </td>\n";
-		html += "<td style=\"text-align: left;\"><br /><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formNTP\" method=\"post\"><input name=\"SetTimeNtp\" type=\"text\" value=\"" + String(config.ntp_host) + "\" />\n";
-		html += "<button type='submit' id='updateTimeNtp'  name=\"commit\"> NTP Update </button>\n";
-		html += "<input type=\"hidden\" name=\"updateTimeNtp\"/></form>\n</td>\n";
-		// html += "<input class=\"btn btn-primary\" id=\"updateTimeNtp\" name=\"updateTimeNtp\" type=\"submit\" value=\"NTP Update\" maxlength=\"80\"/></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>Local Date/Time</label><div class=\"dash-field-body\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTime\" method=\"post\">\n<input name=\"SetTime\" type=\"text\" value=\"" + String(strTime) + "\" />\n";
+		html += "<button type='submit' id='updateTime' name=\"commit\">Time Update</button>\n";
+		html += "<input type=\"hidden\" name=\"updateTime\"/></form></div></div>\n";
 
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">Time Zone </td>\n";
-		html += "<td style=\"text-align: left;\"><br /><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTimeZone\" method=\"post\">\n";
+		html += "<div class=\"dash-field\"><label>NTP Host</label><div class=\"dash-field-body\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formNTP\" method=\"post\"><input name=\"SetTimeNtp\" type=\"text\" value=\"" + String(config.ntp_host) + "\" />\n";
+		html += "<button type='submit' id='updateTimeNtp' name=\"commit\">NTP Update</button>\n";
+		html += "<input type=\"hidden\" name=\"updateTimeNtp\"/></form></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label>Time Zone</label><div class=\"dash-field-body\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formTimeZone\" method=\"post\">\n";
 		html += "<input name=\"SetPosixTZ\" type=\"text\" size=\"30\" maxlength=\"" + String(sizeof(config.posixTZ) - 1) + "\" value=\"" + escapeHtml(String(config.posixTZ)) + "\" placeholder=\"e.g. CET-1CEST,M3.5.0,M10.5.0/3\" />\n";
-		html += "<button type='submit' id='updateTimeZone'  name=\"commit\"> TZ Update </button><br />\n";
-		html += "<label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>POSIX TZ string - handles DST automatically. Reference: <a href=\"https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv\" target=\"_blank\">timezone table</a></i></label>\n";
-		html += "<input type=\"hidden\" name=\"updateTimeZone\"/></form>\n</td>\n";
-		html += "</tr>\n";
+		html += "<button type='submit' id='updateTimeZone' name=\"commit\">TZ Update</button>\n";
+		html += "<span class=\"dash-hint\">POSIX TZ string - handles DST automatically. Reference: <a href=\"https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv\" target=\"_blank\">timezone table</a></span>\n";
+		html += "<input type=\"hidden\" name=\"updateTimeZone\"/></form></div></div>\n";
 
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">SYSTEM REBOOT </td>\n";
-		html += "<td style=\"text-align: left;\"><br /><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formReboot\" method=\"post\"> <button type='submit' id='REBOOT'  name=\"commit\" style=\"background-color:red;color:white\"> REBOOT </button>\n";
-		html += " <input type=\"hidden\" name=\"REBOOT\"/></form>\n</td>\n";
-		// html += "<td style=\"text-align: left;\"><input type='submit' class=\"btn btn-danger\" id=\"REBOOT\" name=\"REBOOT\" value='REBOOT'></td>\n";
-		html += "</tr></table><br /><br />\n";
+		html += "<div class=\"dash-field\"><label>System Reboot</label><div class=\"dash-field-body\"><form accept-charset=\"UTF-8\" action=\"#\" enctype='multipart/form-data' id=\"formReboot\" method=\"post\"><button type='submit' id='REBOOT' name=\"commit\" style=\"background-color:red;color:white\">REBOOT</button>\n";
+		html += "<input type=\"hidden\" name=\"REBOOT\"/></form></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
 		/************************ CONFIG BACKUP/RESTORE **************************/
 		// Plain key=value text (config_fields.h/config_backup.cpp), not the raw
 		// EEPROM bytes the OLED's Save/Load menu items use - this survives a
 		// firmware update that changes sizeof(Configuration), see FORK_NOTES.md.
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>Config Backup / Restore</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">Backup </td>\n";
-		html += "<td style=\"text-align: left;\"><a href=\"/configBackup\" download=\"esp32aprs-config.cfg\"><button type='button'>Download Backup</button></a></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\">Restore </td>\n";
-		html += "<td style=\"text-align: left;\"><form method='POST' action='#' enctype='multipart/form-data' id='formConfigRestore'>";
+		html += "<div class=\"dash-section-title\">Config Backup / Restore</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<div class=\"dash-field\"><label>Backup</label><div class=\"dash-field-body\"><a href=\"/configBackup\" download=\"esp32aprs-config.cfg\"><button type='button'>Download Backup</button></a></div></div>\n";
+		html += "<div class=\"dash-field\"><label>Restore</label><div class=\"dash-field-body\"><form method='POST' action='#' enctype='multipart/form-data' id='formConfigRestore'>";
 		html += "<input id=\"restoreFile\" name=\"restore\" type=\"file\" />";
 		html += "<button type='submit' id='submitConfigRestore' style=\"background-color:red;color:white\">Restore &amp; Reboot</button>";
-		html += "</form></td>\n";
-		html += "</tr></table><br /><br />\n";
+		html += "</form></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 		html += "<script>"
 				"document.getElementById('formConfigRestore').addEventListener('submit', function(e){"
 				"e.preventDefault();"
@@ -548,20 +527,14 @@ void handle_system()
 
 		/************************ WEB AUTH **************************/
 		html += "<form id='formWebAuth' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>Web Authentication</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Web USER:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"32\" maxlength=\"32\" class=\"form-control\" name=\"webauth_user\" type=\"text\" value=\"" + String(config.http_username) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Web PASSWORD:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"63\" maxlength=\"63\" class=\"form-control\" name=\"webauth_pass\" type=\"password\" value=\"" + String(config.http_password) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitWebAuth'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-section-title\">Web Authentication</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<div class=\"dash-field\"><label>Web USER</label><div class=\"dash-field-body\"><input size=\"32\" maxlength=\"32\" class=\"form-control\" name=\"webauth_user\" type=\"text\" value=\"" + String(config.http_username) + "\" /></div></div>\n";
+		html += "<div class=\"dash-field\"><label>Web PASSWORD</label><div class=\"dash-field-body\"><input size=\"63\" maxlength=\"63\" class=\"form-control\" name=\"webauth_pass\" type=\"password\" value=\"" + String(config.http_password) + "\" /></div></div>\n";
+		html += "</div>\n"; // .dash-panel
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitWebAuth' name=\"commit\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWebAuth\"/>\n";
-		html += "</form><br /><br />";
+		html += "</form>\n";
 
 		/************************ DEBUG LOGGING **************************/
 		// Runtime-toggleable console/syslog categories for this project's own
@@ -571,102 +544,55 @@ void handle_system()
 		// internals; see the LOGCAT_* comment in main.h for why these are two
 		// different knobs, not one.
 		html += "<form id='formDebugLog' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>Debug Logging</b></span></th>\n";
-		html += "<tr><td align=\"right\"><b>Categories:</b></td><td style=\"text-align: left;\">\n";
-		html += "<label><input type=\"checkbox\" name=\"logSystem\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_SYSTEM) ? " checked" : "") + " /> System</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logWeb\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_WEB) ? " checked" : "") + " /> Web</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logGps\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_GPS) ? " checked" : "") + " /> GPS</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logAprsRf\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_RF) ? " checked" : "") + " /> APRS RF</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logAprsInet\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_INET) ? " checked" : "") + " /> APRS Internet</label><br />\n";
-		html += "<label><input type=\"checkbox\" name=\"logRfModule\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_RF_MODULE) ? " checked" : "") + " /> RF Module</label><br />\n";
+		html += "<div class=\"dash-section-title\">Debug Logging</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<div class=\"dash-field\"><label>Categories</label><div class=\"dash-field-body\">\n";
+		html += "<label><input type=\"checkbox\" name=\"logSystem\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_SYSTEM) ? " checked" : "") + " /> System</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logWeb\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_WEB) ? " checked" : "") + " /> Web</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logGps\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_GPS) ? " checked" : "") + " /> GPS</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logAprsRf\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_RF) ? " checked" : "") + " /> APRS RF</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logAprsInet\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_APRS_INET) ? " checked" : "") + " /> APRS Internet</label>\n";
+		html += "<label><input type=\"checkbox\" name=\"logRfModule\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_RF_MODULE) ? " checked" : "") + " /> RF Module</label>\n";
 		html += "<label><input type=\"checkbox\" name=\"logBluetooth\" value=\"OK\"" + String((config.logCategoryMask & LOGCAT_BLUETOOTH) ? " checked" : "") + " /> Bluetooth</label>\n";
-		html += "</td></tr>\n";
-		html += "<tr><td align=\"right\"><b>Syslog server:</b></td><td style=\"text-align: left;\">\n";
-		html += "<label><input type=\"checkbox\" name=\"syslogEnable\" value=\"OK\"" + String(config.syslog_en ? " checked" : "") + " /> Enable</label><br />\n";
-		html += "Host: <input size=\"30\" maxlength=\"39\" name=\"syslogHost\" type=\"text\" value=\"" + String(config.syslog_host) + "\" />\n";
-		html += "Port: <input size=\"6\" name=\"syslogPort\" type=\"number\" min=\"1\" max=\"65535\" value=\"" + String(config.syslog_port) + "\" />\n";
-		html += "</td></tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitDebugLog'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "</div></div>\n";
+		html += "<div class=\"dash-field\"><label>Syslog Server</label><div class=\"dash-field-body\">\n";
+		html += "<label><input type=\"checkbox\" name=\"syslogEnable\" value=\"OK\"" + String(config.syslog_en ? " checked" : "") + " /> Enable</label>\n";
+		html += "<label>Host <input size=\"30\" maxlength=\"39\" name=\"syslogHost\" type=\"text\" value=\"" + String(config.syslog_host) + "\" /></label>\n";
+		html += "<label>Port <input size=\"6\" name=\"syslogPort\" type=\"number\" min=\"1\" max=\"65535\" value=\"" + String(config.syslog_port) + "\" /></label>\n";
+		html += "</div></div>\n";
+		html += "</div>\n"; // .dash-panel
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitDebugLog' name=\"commit\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDebugLog\"/>\n";
-		html += "</form><br /><br />";
+		html += "</form>\n";
 
 		/************************ PATH USER define **************************/
 		html += "<form id='formPath' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>PATH USER Define</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>PATH_1:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path1\" type=\"text\" value=\"" + String(config.path[0]) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>PATH_2:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path2\" type=\"text\" value=\"" + String(config.path[1]) + "\" /></td>\n";
-		html += "</tr>\n";
-				html += "<tr>\n";
-		html += "<td align=\"right\"><b>PATH_3:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path3\" type=\"text\" value=\"" + String(config.path[2]) + "\" /></td>\n";
-		html += "</tr>\n";
-				html += "<tr>\n";
-		html += "<td align=\"right\"><b>PATH_4:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path4\" type=\"text\" value=\"" + String(config.path[3]) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitPath'  name=\"commitPath\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-section-title\">PATH USER Define</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<div class=\"dash-field\"><label>PATH_1</label><div class=\"dash-field-body\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path1\" type=\"text\" value=\"" + String(config.path[0]) + "\" /></div></div>\n";
+		html += "<div class=\"dash-field\"><label>PATH_2</label><div class=\"dash-field-body\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path2\" type=\"text\" value=\"" + String(config.path[1]) + "\" /></div></div>\n";
+		html += "<div class=\"dash-field\"><label>PATH_3</label><div class=\"dash-field-body\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path3\" type=\"text\" value=\"" + String(config.path[2]) + "\" /></div></div>\n";
+		html += "<div class=\"dash-field\"><label>PATH_4</label><div class=\"dash-field-body\"><input size=\"72\" maxlength=\"72\" class=\"form-control\" name=\"path4\" type=\"text\" value=\"" + String(config.path[3]) + "\" /></div></div>\n";
+		html += "</div>\n"; // .dash-panel
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitPath' name=\"commitPath\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitPath\"/>\n";
-		html += "</form><br /><br />";
+		html += "</form>\n";
 
 		html += "<form id='formDisp' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<h2>Display Setting</h2>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>Display Setting</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>OLED Enable</b></td>\n";
+		html += "<div class=\"dash-section-title\">Display Setting</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String oledFlageEn = "";
 		if (config.oled_enable == true)
 			oledFlageEn = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"oledEnable\" value=\"OK\" " + oledFlageEn + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>TX Display</b></td>\n";
-		String txdispFlageEn = "";
-		if (config.tx_display == true)
-			txdispFlageEn = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"txdispEnable\" value=\"OK\" " + txdispFlageEn + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All TX Packet for display affter filter.</i></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>RX Display</b></td>\n";
-		String rxdispFlageEn = "";
-		if (config.rx_display == true)
-			rxdispFlageEn = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxdispEnable\" value=\"OK\" " + rxdispFlageEn + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*All RX Packet for display affter filter.</i></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>Head Up</b></td>\n";
+		html += "<div class=\"dash-field\"><label>OLED Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"oledEnable\" value=\"OK\" " + oledFlageEn + "><span class=\"slider round\"></span></label></div></div>\n";
+
 		String hupFlageEn = "";
 		if (config.h_up == true)
 			hupFlageEn = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"hupEnable\" value=\"OK\" " + hupFlageEn + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*The compass will rotate in the direction of movement.</i></label></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>Head Up</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"hupEnable\" value=\"OK\" " + hupFlageEn + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">The compass will rotate in the direction of movement.</span></div></div>\n";
 
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>Popup Delay</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"dispDelay\" id=\"dispDelay\">\n";
-		for (int i = 0; i < 16; i += 1)
-		{
-			if (config.dispDelay == i)
-				html += "<option value=\"" + String(i) + "\" selected>" + String(i) + " Sec</option>\n";
-			else
-				html += "<option value=\"" + String(i) + "\" >" + String(i) + " Sec</option>\n";
-		}
-		html += "</select>\n";
-		html += "</td></tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>OLED Sleep</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"oled_timeout\" id=\"oled_timeout\">\n";
+		html += "<div class=\"dash-field\"><label for=\"oled_timeout\">OLED Sleep</label><div class=\"dash-field-body\"><select name=\"oled_timeout\" id=\"oled_timeout\">\n";
 		for (int i = 0; i <= 600; i += 30)
 		{
 			String label = (i == 0) ? "Never" : (String(i) + " Sec");
@@ -675,14 +601,11 @@ void handle_system()
 			else
 				html += "<option value=\"" + String(i) + "\" >" + label + "</option>\n";
 		}
-		html += "</select>\n";
-		html += "</td></tr>\n";
-		html += "<tr>\n";
+		html += "</select></div></div>\n";
+
 		// Same 5 modes as the OLED-menu's DIM combobox (gui_menu_system.cpp) -
 		// was device-menu-only before this, no web exposure.
-		html += "<td style=\"text-align: right;\"><b>Dim Mode*</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"dimMode\" id=\"dimMode\">\n";
+		html += "<div class=\"dash-field\"><label for=\"dimMode\">Dim Mode*</label><div class=\"dash-field-body\"><select name=\"dimMode\" id=\"dimMode\">\n";
 		{
 			const char *dimNames[5] = {"HI", "LOW", "AUTO DIM", "DAY/NIGHT", "CONTRAST"};
 			for (int i = 0; i < 5; i++)
@@ -693,90 +616,107 @@ void handle_system()
 					html += "<option value=\"" + String(i) + "\" >" + String(dimNames[i]) + "</option>\n";
 			}
 		}
-		html += "</select>\n";
-		html += "<label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*HI: always full brightness.<br />LOW: always dimmed.<br />AUTO DIM: full brightness, dims after 60s idle.<br />DAY/NIGHT: full brightness 05:00-19:00, dimmed otherwise.<br />CONTRAST: fixed brightness set by the Contrast value below.</i></label>\n";
-		html += "</td></tr>\n";
-		html += "<tr>\n";
-		html += "<td style=\"text-align: right;\"><b>Contrast</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"5\" name=\"contrast\" type=\"number\" min=\"0\" max=\"200\" value=\"" + String(config.contrast) + "\" /><label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*Only used when Dim Mode is CONTRAST.</i></label></td>\n";
-		html += "</tr>\n";
+		html += "</select><span class=\"dash-hint\">*HI: always full brightness.<br />LOW: always dimmed.<br />AUTO DIM: full brightness, dims after 60s idle.<br />DAY/NIGHT: full brightness 05:00-19:00, dimmed otherwise.<br />CONTRAST: fixed brightness set by the Contrast value below.</span></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label>Contrast</label><div class=\"dash-field-body\"><input size=\"5\" name=\"contrast\" type=\"number\" min=\"0\" max=\"200\" value=\"" + String(config.contrast) + "\" /><span class=\"dash-hint\">Only used when Dim Mode is CONTRAST.</span></div></div>\n";
+		html += "</div>\n"; // .dash-panel
+
+		// Grouped separately from the OLED/screen settings above - these all
+		// govern the same thing (which received/sent packets pop up on the
+		// OLED, and for how long), not the screen hardware itself.
+		html += "<div class=\"dash-section-title\">Packet Notifications</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
+		String txdispFlageEn = "";
+		if (config.tx_display == true)
+			txdispFlageEn = "checked";
+		html += "<div class=\"dash-field\"><label>TX Display</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"txdispEnable\" value=\"OK\" " + txdispFlageEn + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">All TX Packet for display affter filter.</span></div></div>\n";
+
+		String rxdispFlageEn = "";
+		if (config.rx_display == true)
+			rxdispFlageEn = "checked";
+		html += "<div class=\"dash-field\"><label>RX Display</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"rxdispEnable\" value=\"OK\" " + rxdispFlageEn + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">All RX Packet for display affter filter.</span></div></div>\n";
+
 		String rfFlageEn = "";
 		if (config.dispRF == true)
 			rfFlageEn = "checked";
 		String inetFlageEn = "";
 		if (config.dispINET == true)
 			inetFlageEn = "checked";
-		html += "<tr><td style=\"text-align: right;\"><b>RX Channel</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"dispRF\" value=\"OK\" " + rfFlageEn + "/>RF <input type=\"checkbox\" name=\"dispINET\" value=\"OK\" " + inetFlageEn + "/>Internet </td></tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Filter DX:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input type=\"number\" name=\"filterDX\" min=\"0\" max=\"9999\"\n";
-		html += "step=\"1\" value=\"" + String(config.filterDistant) + "\" /> Km.  <label style=\"vertical-align: bottom;font-size: 8pt;\"> <i>*Value 0 is all distant allow.</i></label></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>RX Channel</label><div class=\"dash-field-body\"><label><input type=\"checkbox\" name=\"dispRF\" value=\"OK\" " + rfFlageEn + "/> RF</label><label><input type=\"checkbox\" name=\"dispINET\" value=\"OK\" " + inetFlageEn + "/> Internet</label><span class=\"dash-hint\">Which source triggers the RX Display OLED popup - RF: packets heard over the air, Internet: packets received via APRS-IS.</span></div></div>\n";
 
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Filter:</b></td>\n";
+		html += "<div class=\"dash-field\"><label>Filter DX</label><div class=\"dash-field-body\"><input type=\"number\" name=\"filterDX\" min=\"0\" max=\"9999\" step=\"1\" value=\"" + String(config.filterDistant) + "\" /> Km.<span class=\"dash-hint\">Value 0 is all distant allow.</span></div></div>\n";
 
-		html += "<td align=\"center\">\n";
-		html += "<fieldset id=\"filterDispGrp\">\n";
-		html += "<legend>Show in popup display</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
-		html += "<tr style=\"background:unset;\">";
+		html += "<div class=\"dash-field\"><label for=\"dispDelay\">Popup Delay</label><div class=\"dash-field-body\"><select name=\"dispDelay\" id=\"dispDelay\">\n";
+		for (int i = 0; i < 16; i += 1)
+		{
+			if (config.dispDelay == i)
+				html += "<option value=\"" + String(i) + "\" selected>" + String(i) + " Sec</option>\n";
+			else
+				html += "<option value=\"" + String(i) + "\" >" + String(i) + " Sec</option>\n";
+		}
+		html += "</select></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
-		// html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"dispTNC\" name=\"dispTNC\" type=\"checkbox\" value=\"OK\" " + rfFlageEn + "/>From RF</td>\n";
-
-		// html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"dispINET\" name=\"dispINET\" type=\"checkbox\" value=\"OK\" " + inetFlageEn + "/>From INET</td>\n";
+		html += "<div class=\"dash-section-title\">Filter</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<fieldset id=\"filterDispGrp\" class=\"dash-filter-grp\">\n";
+		html += "<legend>Show in popup display</legend>\n";
+		html += "<div class=\"dash-checkbox-grid\">\n";
 
 		String filterMessageFlageEn = "";
 		if (config.dispFilter & FILTER_MESSAGE)
 			filterMessageFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterMessage\" name=\"filterMessage\" type=\"checkbox\" value=\"OK\" " + filterMessageFlageEn + "/>Message</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterMessage\" name=\"filterMessage\" type=\"checkbox\" value=\"OK\" " + filterMessageFlageEn + "/> Message</label>\n";
 
 		String filterStatusFlageEn = "";
 		if (config.dispFilter & FILTER_STATUS)
 			filterStatusFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterStatus\" name=\"filterStatus\" type=\"checkbox\" value=\"OK\" " + filterStatusFlageEn + "/>Status</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterStatus\" name=\"filterStatus\" type=\"checkbox\" value=\"OK\" " + filterStatusFlageEn + "/> Status</label>\n";
 
 		String filterTelemetryFlageEn = "";
 		if (config.dispFilter & FILTER_TELEMETRY)
 			filterTelemetryFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterTelemetry\" name=\"filterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterTelemetryFlageEn + "/>Telemetry</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterTelemetry\" name=\"filterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterTelemetryFlageEn + "/> Telemetry</label>\n";
 
 		String filterWeatherFlageEn = "";
 		if (config.dispFilter & FILTER_WX)
 			filterWeatherFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterWeather\" name=\"filterWeather\" type=\"checkbox\" value=\"OK\" " + filterWeatherFlageEn + "/>Weather</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterWeather\" name=\"filterWeather\" type=\"checkbox\" value=\"OK\" " + filterWeatherFlageEn + "/> Weather</label>\n";
 
 		String filterObjectFlageEn = "";
 		if (config.dispFilter & FILTER_OBJECT)
 			filterObjectFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterObject\" name=\"filterObject\" type=\"checkbox\" value=\"OK\" " + filterObjectFlageEn + "/>Object</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterObject\" name=\"filterObject\" type=\"checkbox\" value=\"OK\" " + filterObjectFlageEn + "/> Object</label>\n";
 
 		String filterItemFlageEn = "";
 		if (config.dispFilter & FILTER_ITEM)
 			filterItemFlageEn = "checked";
-		html += "</tr><tr style=\"background:unset;\"><td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterItem\" name=\"filterItem\" type=\"checkbox\" value=\"OK\" " + filterItemFlageEn + "/>Item</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterItem\" name=\"filterItem\" type=\"checkbox\" value=\"OK\" " + filterItemFlageEn + "/> Item</label>\n";
 
 		String filterQueryFlageEn = "";
 		if (config.dispFilter & FILTER_QUERY)
 			filterQueryFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterQuery\" name=\"filterQuery\" type=\"checkbox\" value=\"OK\" " + filterQueryFlageEn + "/>Query</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterQuery\" name=\"filterQuery\" type=\"checkbox\" value=\"OK\" " + filterQueryFlageEn + "/> Query</label>\n";
 
 		String filterBuoyFlageEn = "";
 		if (config.dispFilter & FILTER_BUOY)
 			filterBuoyFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterBuoy\" name=\"filterBuoy\" type=\"checkbox\" value=\"OK\" " + filterBuoyFlageEn + "/>Buoy</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterBuoy\" name=\"filterBuoy\" type=\"checkbox\" value=\"OK\" " + filterBuoyFlageEn + "/> Buoy</label>\n";
 
 		String filterPositionFlageEn = "";
 		if (config.dispFilter & FILTER_POSITION)
 			filterPositionFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" id=\"filterPosition\" name=\"filterPosition\" type=\"checkbox\" value=\"OK\" " + filterPositionFlageEn + "/>Position</td>\n";
+		html += "<label><input class=\"field_checkbox\" id=\"filterPosition\" name=\"filterPosition\" type=\"checkbox\" value=\"OK\" " + filterPositionFlageEn + "/> Position</label>\n";
 
-		html += "<td style=\"border:unset;\"></td>";
-		html += "</tr></table></fieldset>\n";
+		html += "</div>\n";
+		html += "</fieldset>\n";
+		html += "</div>\n"; // .dash-panel
 
-		html += "</td></tr></table><br />\n";
-		html += "<div><button type='submit' id='submitDISP'  name=\"commitDISP\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitDISP' name=\"commitDISP\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDISP\"/>\n";
-		html += "</form><br />";
+		html += "</form>\n";
+		html += "</div>\n"; // .dash
 		server.send(200, "text/html", html); // send to someones browser when asked
 	}
 }
@@ -835,8 +775,21 @@ void handle_wireless()
 	{
 		bool wifiSTA = false;
 		String nameSSID, namePASS;
+		// Reset all 5 slots before repopulating from whatever fields the
+		// submission actually contains - mirrors how "Remove Station" (JS)
+		// works: it deletes that station's <tr> (and its inputs) from the DOM
+		// rather than posting empty values, so a removed station's
+		// wifi_ssid{n}/wifi_pass{n} fields are simply absent from this
+		// request, not present-but-empty. Without clearing here too, only
+		// `enable` got reset and the old ssid/pass stayed in EEPROM forever -
+		// the station reappeared on the next page load because the "still
+		// has a saved ssid" half of the display check kept firing.
 		for (int n = 0; n < 5; n++)
+		{
 			config.wifi_sta[n].enable = false;
+			config.wifi_sta[n].wifi_ssid[0] = 0;
+			config.wifi_sta[n].wifi_pass[0] = 0;
+		}
 		for (uint8_t i = 0; i < server.args(); i++)
 		{
 			if (server.argName(i) == "wificlient")
@@ -977,49 +930,42 @@ void handle_wireless()
 		html += "});\n";
 		html += "</script>\n";
 		/************************ WiFi AP **************************/
+		html += "<div class=\"dash\">\n";
 		html += "<form id='formWiFiAP' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<h2>WiFi Access Point</h2>\n";
-		html += "<table>\n";
-		// html += "<tr>\n";
-		// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
-		// html += "<th><span><b>Value</b></span></th>\n";
-		// html += "</tr>\n";
-		html += "<th colspan=\"2\"><span><b>WiFi Access Point</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\" width=\"120\"><b>Enable:</b></td>\n";
+		html += "<div class=\"dash-section-title\">WiFi Access Point</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String wifiAPEnFlag = "";
 		if (config.wifi_mode & WIFI_AP_FIX)
 			wifiAPEnFlag = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wifiAP\" value=\"OK\" " + wifiAPEnFlag + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>WiFi AP SSID:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"32\" maxlength=\"32\" class=\"form-control\" id=\"wifi_ssidAP\" name=\"wifi_ssidAP\" type=\"text\" value=\"" + String(config.wifi_ap_ssid) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>WiFi AP PASSWORD:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input size=\"63\" maxlength=\"63\" class=\"form-control\" id=\"wifi_passAP\" name=\"wifi_passAP\" type=\"password\" value=\"" + String(config.wifi_ap_pass) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitWiFiAP'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-field\"><label>Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"wifiAP\" value=\"OK\" " + wifiAPEnFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"wifi_ssidAP\">WiFi AP SSID</label><div class=\"dash-field-body\"><input size=\"32\" maxlength=\"32\" class=\"form-control\" id=\"wifi_ssidAP\" name=\"wifi_ssidAP\" type=\"text\" value=\"" + String(config.wifi_ap_ssid) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"wifi_passAP\">WiFi AP PASSWORD</label><div class=\"dash-field-body\"><input size=\"63\" maxlength=\"63\" class=\"form-control\" id=\"wifi_passAP\" name=\"wifi_passAP\" type=\"password\" value=\"" + String(config.wifi_ap_pass) + "\" /></div></div>\n";
+		html += "</div>\n"; // .dash-panel
+
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitWiFiAP' name=\"commit\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWiFiAP\"/>\n";
-		html += "</form><br />";
+		html += "</form>\n";
 		/************************ WiFi Client **************************/
-		html += "<br />\n";
+		// NOTE: the station list below is intentionally left as a native
+		// <table>/<tr>/<td> structure (not the .dash-field/.dash-panel
+		// pattern) because addWifiStation() below (untouched, verbatim)
+		// does document.createElement('tr') + appendChild() into this exact
+		// table/tbody - switching the container to a <div> would break
+		// newly-added stations rendering as real table rows. It still gets
+		// the dashboard card look via the '.dash table' theming rule.
 		html += "<form id='formWiFiClient' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		html += "<table>\n";
-		html += "<th colspan=\"2\"><span><b>WiFi Multi Station</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>WiFi STA Enable:</b></td>\n";
+		html += "<div class=\"dash-section-title\">WiFi Multi Station</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String wifiClientEnFlag = "";
 		if (config.wifi_mode & WIFI_STA_FIX)
 			wifiClientEnFlag = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" " + wifiClientEnFlag + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>WiFi RF Power:</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"wifi_pwr\" id=\"wifi_pwr\">\n";
+		html += "<div class=\"dash-field\"><label>WiFi STA Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"wificlient\" value=\"OK\" " + wifiClientEnFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"wifi_pwr\">WiFi RF Power</label><div class=\"dash-field-body\"><select name=\"wifi_pwr\" id=\"wifi_pwr\">\n";
 		for (int i = 0; i < 12; i++)
 		{
 			if (config.wifi_power == wifiPwr[i][0])
@@ -1027,9 +973,11 @@ void handle_wireless()
 			else
 				html += "<option value=\"" + String(wifiPwr[i][0], 0) + "\" >" + String(wifiPwr[i][1], 1) + " dBm</option>\n";
 		}
-		html += "</select>\n";
-		html += "</td>\n";
-		html += "</tr>\n";
+		html += "</select></div></div>\n";
+		html += "</div>\n"; // .dash-panel
+
+		html += "<div class=\"dash-panel\">\n";
+		html += "<table>\n";
 		html += "<tbody id=\"wifiStationList\">\n";
 		for (int n = 0; n < 5; n++)
 		{
@@ -1068,7 +1016,8 @@ void handle_wireless()
 		html += "<td colspan=\"2\" style=\"text-align: center; padding: 10px;\"><button type=\"button\" style=\"background-color:#2194ec;color:white;font-size:12px;padding:5px 12px;border:none;border-radius:3px;cursor:pointer;\" onclick=\"addWifiStation()\">+ Add Network</button></td>\n";
 		html += "</tr>\n";
 
-		html += "</table><br />\n";
+		html += "</table>\n";
+		html += "</div>\n"; // .dash-panel
 		html += "<script>\n";
 		html += "function updateAddButtonVisibility() {\n";
 		html += "  const rows = document.querySelectorAll('.station-row').length;\n";
@@ -1114,46 +1063,28 @@ void handle_wireless()
 		html += "}\n";
 		html += "updateAddButtonVisibility();\n";
 		html += "</script>\n";
-		html += "<div><button type='submit' id='submitWiFiClient'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitWiFiClient' name=\"commit\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitWiFiClient\"/>\n";
-		html += "</form><br />";
+		html += "</form>\n";
 		/************************ Bluetooth **************************/
-		html += "<br />\n";
 		html += "<form id='formBluetooth' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<h2>Bluetooth Master (BLE)</h2>\n";
-		html += "<table>\n";
-		// html += "<tr>\n";
-		// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
-		// html += "<th><span><b>Value</b></span></th>\n";
-		// html += "</tr>\n";
-		html += "<th colspan=\"2\"><span><b>Bluetooth Master (BLE)</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Enable:</b></td>\n";
+		html += "<div class=\"dash-section-title\">Bluetooth Master (BLE)</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String btEnFlag = "";
 		if (config.bt_master)
 			btEnFlag = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"btMaster\" value=\"OK\" " + btEnFlag + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>NAME:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"20\" id=\"bt_name\" name=\"bt_name\" type=\"text\" value=\"" + String(config.bt_name) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>UUID:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"" + String(config.bt_uuid) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>UUID RX:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_rx\" name=\"bt_uuid_rx\" type=\"text\" value=\"" + String(config.bt_uuid_rx) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>UUID TX:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"" + String(config.bt_uuid_tx) + "\" /></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"btMaster\" value=\"OK\" " + btEnFlag + "><span class=\"slider round\"></span></label></div></div>\n";
 
-		html += "<td align=\"right\"><b>MODE:</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"bt_mode\" id=\"bt_mode\">\n";
+		html += "<div class=\"dash-field\"><label for=\"bt_name\">Name</label><div class=\"dash-field-body\"><input maxlength=\"20\" id=\"bt_name\" name=\"bt_name\" type=\"text\" value=\"" + String(config.bt_name) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"bt_uuid\">UUID</label><div class=\"dash-field-body\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid\" name=\"bt_uuid\" type=\"text\" value=\"" + String(config.bt_uuid) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"bt_uuid_rx\">UUID RX</label><div class=\"dash-field-body\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_rx\" name=\"bt_uuid_rx\" type=\"text\" value=\"" + String(config.bt_uuid_rx) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"bt_uuid_tx\">UUID TX</label><div class=\"dash-field-body\"><input maxlength=\"37\" size=\"38\" id=\"bt_uuid_tx\" name=\"bt_uuid_tx\" type=\"text\" value=\"" + String(config.bt_uuid_tx) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"bt_mode\">Mode</label><div class=\"dash-field-body\"><select name=\"bt_mode\" id=\"bt_mode\">\n";
 		String btModeOff = "";
 		String btModeTNC2 = "";
 		String btModeKISS = "";
@@ -1172,14 +1103,13 @@ void handle_wireless()
 		html += "<option value=\"0\" " + btModeOff + ">NONE</option>\n";
 		html += "<option value=\"1\" " + btModeTNC2 + ">TNC2</option>\n";
 		html += "<option value=\"2\" " + btModeKISS + ">KISS</option>\n";
-		html += "</select>\n";
+		html += "</select><span class=\"dash-hint\">See the following for generating UUIDs: <a href=\"https://www.uuidgenerator.net\" target=\"_blank\">https://www.uuidgenerator.net</a></span></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
-		html += "<label style=\"font-size: 8pt;text-align: right;\">*See the following for generating UUIDs: <a href=\"https://www.uuidgenerator.net\" target=\"_blank\">https://www.uuidgenerator.net</a></label></td>\n";
-		html += "</tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitBluetooth'  name=\"commit\"> Apply Change </button></div>\n";
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitBluetooth' name=\"commit\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitBluetooth\"/>\n";
-		html += "</form>";
+		html += "</form>\n";
+		html += "</div>\n"; // .dash
 		server.send(200, "text/html", html); // send to someones browser when asked
 	}
 }

@@ -15,6 +15,38 @@
 #include "wifi_config.h"
 
 
+// Manual "Send Beacon Now" button (Dashboard) - reuses the existing
+// EVENT_TX_POSITION flag taskAPRS already polls for automatic/smartbeacon
+// sends (main.cpp, "if (EVENT_TX_POSITION > 0)"); event code 9 is unused by
+// any of the automatic triggers (1, 4-8), so it's distinguishable in logs.
+// Rate-limited client-side-visible: at most once per 60s, tracked here
+// since this is the only place that sets it from outside taskAPRS.
+static unsigned long trk_lastManualBeacon = 0;
+
+void handle_trackerSendBeacon()
+{
+	if (!server.authenticate(config.http_username, config.http_password))
+	{
+		return server.requestAuthentication();
+	}
+	if (!config.trk_en)
+	{
+		server.send(200, "text/plain", "FAIL: Tracker is disabled");
+		return;
+	}
+	unsigned long now = millis();
+	if (trk_lastManualBeacon != 0 && (now - trk_lastManualBeacon) < 60000UL)
+	{
+		unsigned long waitSec = (60000UL - (now - trk_lastManualBeacon) + 999) / 1000;
+		server.send(200, "text/plain", "FAIL: Please wait " + String(waitSec) + "s");
+		return;
+	}
+	trk_lastManualBeacon = now;
+	EVENT_TX_POSITION = 9;
+	projLog(LOGCAT_APRS_RF, "Manual beacon requested from Dashboard");
+	server.send(200, "text/plain", "OK");
+}
+
 void handle_tracker()
 {
 	if (!server.authenticate(config.http_username, config.http_password))
@@ -22,6 +54,7 @@ void handle_tracker()
 		return server.requestAuthentication();
 	}
 	bool trakerEn = false;
+	bool smartTrackerEn = false;
 	bool smartEn = false;
 	bool compEn = false;
 
@@ -44,6 +77,14 @@ void handle_tracker()
 				{
 					if (String(server.arg(i)) == "OK")
 						trakerEn = true;
+				}
+			}
+			if (server.argName(i) == "smartTrackerEnable")
+			{
+				if (server.arg(i) != "")
+				{
+					if (String(server.arg(i)) == "OK")
+						smartTrackerEn = true;
 				}
 			}
 			if (server.argName(i) == "smartBcnEnable")
@@ -301,6 +342,7 @@ void handle_tracker()
 			}
 		}
 		config.trk_en = trakerEn;
+		config.trk_smarttracker = smartTrackerEn;
 		config.trk_smartbeacon = smartEn;
 		config.trk_compress = compEn;
 
@@ -318,6 +360,9 @@ void handle_tracker()
 		initInterval=true;
 		String html = "OK";
 		server.send(200, "text/html", html);
+		return; // without this, execution fell through into building and
+				// sending the full GET-branch page too, as a second
+				// server.send() on the same request
 	}
 
 	String html = "<script type=\"text/javascript\">\n";
@@ -387,37 +432,42 @@ void handle_tracker()
 	html += "if (document.querySelector('#smartBcnEnable').checked) {\n";
 	// Checkbox has been checked
 	html += "document.getElementById(\"smartbcnGrp\").disabled=false;\n";
+	html += "document.getElementById(\"trackerIntervalGrp\").style.display=\"none\";\n";
 	html += "} else {\n";
 	// Checkbox has been unchecked
 	html += "document.getElementById(\"smartbcnGrp\").disabled=true;\n";
+	html += "document.getElementById(\"trackerIntervalGrp\").style.display=\"\";\n";
 	html += "}\n}\n";
+	html += "function onTrackerPosSelChange() {\n";
+	html += "var isGPS = document.querySelector('input[name=\"trackerPosSel\"][value=\"1\"]').checked;\n";
+	html += "document.getElementById(\"trackerFixPosGrp\").style.display = isGPS ? \"none\" : \"\";\n";
+	html += "}\n";
 
 	html += "</script>\n";
 
 	/************************ tracker Mode **************************/
+	html += "<div class=\"dash\">\n";
 	html += "<form id='formtracker' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-	// html += "<h2>[TRACKER] Tracker Position Mode</h2>\n";
-	html += "<table>\n";
-	// html += "<tr>\n";
-	// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
-	// html += "<th><span><b>Value</b></span></th>\n";
-	// html += "</tr>\n";
-	html += "<th colspan=\"2\"><span><b>[TRACKER] Tracker Position Mode</b></span></th>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Enable:</b></td>\n";
+	html += "<div class=\"dash-section-title\">[TRACKER] Tracker Position Mode</div>\n";
+	html += "<div class=\"dash-panel\">\n";
+
 	String trackerEnFlag = "";
 	if (config.trk_en)
 		trackerEnFlag = "checked";
-	html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerEnable\" value=\"OK\" " + trackerEnFlag + "><span class=\"slider round\"></span></label></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Station Callsign:</b></td>\n";
-	html += "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.trk_mycall) + "\" /></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Station SSID:</b></td>\n";
-	html += "<td style=\"text-align: left;\">\n";
-	html += "<select name=\"mySSID\" id=\"mySSID\">\n";
+	html += "<div class=\"dash-field\"><label>Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerEnable\" value=\"OK\" " + trackerEnFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+
+	// SmartTracker (issue #31): only the toggle so far - the actual
+	// WiFi-loss auto-transmit behavior isn't implemented yet. Not the
+	// existing "Smart Beacon" feature below (dynamic beacon interval,
+	// config.trk_smartbeacon) - a different, unrelated setting.
+	String smartTrackerEnFlag = "";
+	if (config.trk_smarttracker)
+		smartTrackerEnFlag = "checked";
+	html += "<div class=\"dash-field\"><label>SmartTracker</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"smartTrackerEnable\" value=\"OK\" " + smartTrackerEnFlag + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">Auto-transmit only while WiFi is unavailable (not implemented yet)</span></div></div>\n";
+
+	html += "<div class=\"dash-field\"><label for=\"myCall\">Station Callsign</label><div class=\"dash-field-body\"><input maxlength=\"7\" size=\"9\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.trk_mycall) + "\" /></div></div>\n";
+
+	html += "<div class=\"dash-field\"><label for=\"mySSID\">Station SSID</label><div class=\"dash-field-body\"><select name=\"mySSID\" id=\"mySSID\">\n";
 	for (uint8_t ssid = 0; ssid <= 15; ssid++)
 	{
 		if (config.trk_ssid == ssid)
@@ -429,64 +479,47 @@ void handle_tracker()
 			html += "<option value=\"" + String(ssid) + "\">" + String(ssid) + "</option>\n";
 		}
 	}
-	html += "</select></td>\n";
-	html += "</tr>\n";
+	html += "</select></div></div>\n";
 
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Item/Obj Name:</b></td>\n";
-	html += "<td style=\"text-align: left;\"><input maxlength=\"9\" size=\"9\" id=\"trackerObject\" name=\"trackerObject\" type=\"text\" value=\"" + String(config.trk_item) + "\" /><i> *If not used, leave it blank.In use 3-9 charactor</i></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>PATH:</b></td>\n";
-	html += "<td style=\"text-align: left;\">\n";
-	html += "<select name=\"trackerPath\" id=\"trackerPath\">\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerObject\">Item/Obj Name</label><div class=\"dash-field-body\"><input maxlength=\"9\" size=\"9\" id=\"trackerObject\" name=\"trackerObject\" type=\"text\" value=\"" + String(config.trk_item) + "\" /><span class=\"dash-hint\">If not used, leave it blank. In use 3-9 charactor</span></div></div>\n";
+
+	html += "<div class=\"dash-field\"><label for=\"trackerPath\">Path</label><div class=\"dash-field-body\"><select name=\"trackerPath\" id=\"trackerPath\">\n";
 	for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
 	{
+		String pthLabel = String(PATH_NAME[pthIdx]);
+		if (pthIdx == PATH_DEFAULT_MOBILE)
+			pthLabel += " (default)";
 		if (config.trk_path == pthIdx)
 		{
-			html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			html += "<option value=\"" + String(pthIdx) + "\" selected>" + pthLabel + "</option>\n";
 		}
 		else
 		{
-			html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+			html += "<option value=\"" + String(pthIdx) + "\">" + pthLabel + "</option>\n";
 		}
 	}
-	html += "</select></td>\n";
-	//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"trackerPath\" name=\"trackerPath\" type=\"text\" value=\"" + String(config.trk_path) + "\" /></td>\n";
-	html += "</tr>\n";
+	html += "</select></div></div>\n";
 
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
-	html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" id=\"trackerComment\" name=\"trackerComment\" type=\"text\" value=\"" + String(config.trk_comment) + "\" /></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Smart Beacon:</b></td>\n";
-	String smartBcnEnFlag = "";
-	if (config.trk_smartbeacon)
-		smartBcnEnFlag = "checked";
-	html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" id=\"smartBcnEnable\" name=\"smartBcnEnable\" onclick=\"onSmartCheck()\" value=\"OK\" " + smartBcnEnFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch use to smart beacon mode</i></label></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Compress:</b></td>\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerComment\">Text Comment</label><div class=\"dash-field-body\"><input maxlength=\"50\" size=\"50\" id=\"trackerComment\" name=\"trackerComment\" type=\"text\" value=\"" + String(config.trk_comment) + "\" /></div></div>\n";
+
 	String compressEnFlag = "";
 	if (config.trk_compress)
 		compressEnFlag = "checked";
-	html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"compressEnable\" value=\"OK\" " + compressEnFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\"><i> *Switch compress packet</i></label></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Time Stamp:</b></td>\n";
+	html += "<div class=\"dash-field\"><label>Compress</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"compressEnable\" value=\"OK\" " + compressEnFlag + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">Switch compress packet</span></div></div>\n";
+
 	String timeStampFlag = "";
 	if (config.trk_timestamp)
 		timeStampFlag = "checked";
-	html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
-	html += "</tr>\n";
+	html += "<div class=\"dash-field\"><label>Time Stamp</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"trackerTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+
 	String trackerPos2RFFlag = "";
 	String trackerPos2INETFlag = "";
 	if (config.trk_loc2rf)
 		trackerPos2RFFlag = "checked";
 	if (config.trk_loc2inet)
 		trackerPos2INETFlag = "checked";
-	html += "<tr><td style=\"text-align: right;\"><b>TX Channel:</b></td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" " + trackerPos2RFFlag + "/>RF <input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" " + trackerPos2INETFlag + "/>Internet </td></tr>\n";
+	html += "<div class=\"dash-field\"><label>TX Channel</label><div class=\"dash-field-body\"><label><input type=\"checkbox\" name=\"trackerPos2RF\" value=\"OK\" " + trackerPos2RFFlag + "/> RF</label><label><input type=\"checkbox\" name=\"trackerPos2INET\" value=\"OK\" " + trackerPos2INETFlag + "/> Internet</label></div></div>\n";
+
 	String trackerOptBatFlag = "";
 	String trackerOptSatFlag = "";
 	String trackerOptAltFlag = "";
@@ -499,18 +532,29 @@ void handle_tracker()
 		trackerOptAltFlag = "checked";
 	if (config.trk_cst)
 		trackerOptCSTFlag = "checked";
-	html += "<tr><td style=\"text-align: right;\"><b>Option:</b></td><td style=\"text-align: left;\">";
-	html += "<input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/>Course/Speed ";
-	html += "<input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/>Altitude ";
-	html += "<input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/>Battery ";
-	html += "<input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/>Satellite";
-	html += "</td></tr>\n";
+	html += "<div class=\"dash-field\"><label>Option</label><div class=\"dash-field-body\">";
+	html += "<label><input type=\"checkbox\" name=\"trackerOptCST\" value=\"OK\" " + trackerOptCSTFlag + "/> Course/Speed</label>";
+	html += "<label><input type=\"checkbox\" name=\"trackerOptAlt\" value=\"OK\" " + trackerOptAltFlag + "/> Altitude</label>";
+	html += "<label><input type=\"checkbox\" name=\"trackerOptBat\" value=\"OK\" " + trackerOptBatFlag + "/> Battery</label>";
+	html += "<label><input type=\"checkbox\" name=\"trackerOptSat\" value=\"OK\" " + trackerOptSatFlag + "/> Satellite</label>";
+	html += "</div></div>\n";
+	html += "</div>\n"; // .dash-panel
 
-	html += "<tr>";
-	html += "<td align=\"right\"><b>POSITION:</b></td>\n";
-	html += "<td align=\"center\">\n";
-	html += "<table>";
-	html += "<tr><td style=\"text-align: right;\">Interval:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"trackerPosInv\" name=\"trackerPosInv\" type=\"number\" value=\"" + String(config.trk_interval) + "\" />Sec.</label></td></tr>";
+	html += "<div class=\"dash-section-title\">Position</div>\n";
+	html += "<div class=\"dash-panel\">\n";
+
+	String smartBcnEnFlag = "";
+	if (config.trk_smartbeacon)
+		smartBcnEnFlag = "checked";
+	html += "<div class=\"dash-field\"><label>Smart Beacon</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" id=\"smartBcnEnable\" name=\"smartBcnEnable\" onclick=\"onSmartCheck()\" value=\"OK\" " + smartBcnEnFlag + "><span class=\"slider round\"></span></label><span class=\"dash-hint\">Dynamic interval based on speed/heading (see Smart Beacon section below) - overrides the fixed Interval while enabled</span></div></div>\n";
+
+	// Interval is ignored once Smart Beacon computes tx_interval itself
+	// (see main.cpp/beacon_builder.cpp) - hidden while Smart Beacon is on so
+	// it can't be mistaken for the active setting.
+	html += "<div id=\"trackerIntervalGrp\"" + String(config.trk_smartbeacon ? " style=\"display:none\"" : "") + ">\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerPosInv\">Interval</label><div class=\"dash-field-body\"><input min=\"0\" max=\"3600\" step=\"1\" id=\"trackerPosInv\" name=\"trackerPosInv\" type=\"number\" value=\"" + String(config.trk_interval) + "\" /> Sec.</div></div>\n";
+	html += "</div>\n"; // #trackerIntervalGrp
+
 	String trackerPosFixFlag = "";
 	String trackerPosGPSFlag = "";
 
@@ -519,59 +563,60 @@ void handle_tracker()
 	else
 		trackerPosFixFlag = "checked=\"checked\"";
 
-	html += "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"trackerPosSel\" value=\"0\" " + trackerPosFixFlag + "/>Fix <input type=\"radio\" name=\"trackerPosSel\" value=\"1\" " + trackerPosGPSFlag + "/>GPS </td></tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\">Symbol Icon:</td>\n";
+	html += "<div class=\"dash-field\"><label>Location Source</label><div class=\"dash-field-body\"><label><input type=\"radio\" name=\"trackerPosSel\" value=\"0\" onchange=\"onTrackerPosSelChange()\" " + trackerPosFixFlag + "/> Fix</label><label><input type=\"radio\" name=\"trackerPosSel\" value=\"1\" onchange=\"onTrackerPosSelChange()\" " + trackerPosGPSFlag + "/> GPS</label></div></div>\n";
+
 	String table = "1";
 	if (config.trk_symbol[0] == 47)
 		table = "1";
 	if (config.trk_symbol[0] == 92)
 		table = "2";
-	html += "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"" + String(config.trk_symbol[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"" + String(config.trk_symbol[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"/icon.png?c=" + String((int)config.trk_symbol[1]) + "&t=" + table + "\"> <i>*Click icon for select symbol</i></td>\n";
-	html += "</tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"trackerPosLat\" name=\"trackerPosLat\" type=\"number\" value=\"" + String(config.trk_lat, 5) + "\" />degrees (positive for North, negative for South)</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"trackerPosLon\" name=\"trackerPosLon\" type=\"number\" value=\"" + String(config.trk_lon, 5) + "\" />degrees (positive for East, negative for West)</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"trackerPosAlt\" name=\"trackerPosAlt\" type=\"number\" value=\"" + String(config.trk_alt, 2) + "\" /> meter. *Value 0 is not send height</td></tr>\n";
-	html += "</table></td>";
-	html += "</tr>\n";
+	html += "<div class=\"dash-field\"><label>Symbol Icon</label><div class=\"dash-field-body\">Table:<input maxlength=\"1\" size=\"1\" id=\"trackerTable\" name=\"trackerTable\" type=\"text\" value=\"" + String(config.trk_symbol[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"trackerSymbol\" name=\"trackerSymbol\" type=\"text\" value=\"" + String(config.trk_symbol[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"trackerImgSymbol\" onclick=\"openWindowSymbol(0);\" src=\"/icon.png?c=" + String((int)config.trk_symbol[1]) + "&t=" + table + "\"> <span class=\"dash-hint\">Click icon to select a symbol</span></div></div>\n";
 
-	html += "<tr>\n";
-	html += "<td align=\"right\"><b>Smart Beacon:</b></td>\n";
-	html += "<td align=\"center\">\n";
+	// Lat/Lon/Alt only make sense for a Fix position - hidden while GPS is
+	// selected (issue - Location Source Fix/GPS field visibility).
+	html += "<div id=\"trackerFixPosGrp\"" + String(config.trk_gps ? " style=\"display:none\"" : "") + ">\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerPosLat\">Latitude</label><div class=\"dash-field-body\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"trackerPosLat\" name=\"trackerPosLat\" type=\"number\" value=\"" + String(config.trk_lat, 5) + "\" /><span class=\"dash-hint\">degrees (positive for North, negative for South)</span></div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerPosLon\">Longitude</label><div class=\"dash-field-body\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"trackerPosLon\" name=\"trackerPosLon\" type=\"number\" value=\"" + String(config.trk_lon, 5) + "\" /><span class=\"dash-hint\">degrees (positive for East, negative for West)</span></div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"trackerPosAlt\">Altitude</label><div class=\"dash-field-body\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"trackerPosAlt\" name=\"trackerPosAlt\" type=\"number\" value=\"" + String(config.trk_alt, 2) + "\" /><span class=\"dash-hint\">meters - value 0 is not sent</span></div></div>\n";
+	html += "</div>\n"; // #trackerFixPosGrp
+	html += "</div>\n"; // .dash-panel
+
+	html += "<div class=\"dash-section-title\">Smart Beacon</div>\n";
+	html += "<div class=\"dash-panel\">\n";
 	if (config.trk_smartbeacon)
-		html += "<fieldset id=\"smartbcnGrp\">\n";
+		html += "<fieldset id=\"smartbcnGrp\" class=\"dash-filter-grp\">\n";
 	else
-		html += "<fieldset id=\"smartbcnGrp\" disabled>\n";
-	html += "<legend>Smart beacon configuration</legend>\n<table>";
-	html += "<tr>\n";
-	html += "<td align=\"right\">Move Symbol:</td>\n";
+		html += "<fieldset id=\"smartbcnGrp\" class=\"dash-filter-grp\" disabled>\n";
+	html += "<legend>Smart beacon configuration</legend>\n";
+
 	table = "1";
 	if (config.trk_symmove[0] == 47)
 		table = "1";
 	if (config.trk_symmove[0] == 92)
 		table = "2";
-	html += "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"" + String(config.trk_symmove[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"" + String(config.trk_symmove[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"/icon.png?c=" + String((int)config.trk_symmove[1]) + "&t=" + table + "\"> <i>*Click icon for select MOVE symbol</i></td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td align=\"right\">Stop Symbol:</td>\n";
+	html += "<div class=\"dash-field\"><label>Move Symbol</label><div class=\"dash-field-body\">Table:<input maxlength=\"1\" size=\"1\" id=\"moveTable\" name=\"moveTable\" type=\"text\" value=\"" + String(config.trk_symmove[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"moveSymbol\" name=\"moveSymbol\" type=\"text\" value=\"" + String(config.trk_symmove[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"moveImgSymbol\" onclick=\"openWindowSymbol(1);\" src=\"/icon.png?c=" + String((int)config.trk_symmove[1]) + "&t=" + table + "\"> <span class=\"dash-hint\">Click icon to select the MOVE symbol</span></div></div>\n";
+
 	table = "1";
 	if (config.trk_symstop[0] == 47)
 		table = "1";
 	if (config.trk_symstop[0] == 92)
 		table = "2";
-	html += "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"" + String(config.trk_symstop[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"" + String(config.trk_symstop[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"/icon.png?c=" + String((int)config.trk_symstop[1]) + "&t=" + table + "\"> <i>*Click icon for select STOP symbol</i></td>\n";
-	html += "</tr>\n";
-	html += "<tr><td style=\"text-align: right;\">High Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"1000\" step=\"1\" id=\"hspeed\" name=\"hspeed\" type=\"number\" value=\"" + String(config.trk_hspeed) + "\" /> km/h</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Low Speed:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"250\" step=\"1\" id=\"lspeed\" name=\"lspeed\" type=\"number\" value=\"" + String(config.trk_lspeed) + "\" /> km/h</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Slow Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"60\" max=\"3600\" step=\"1\" id=\"slowInterval\" name=\"slowInterval\" type=\"number\" value=\"" + String(config.trk_slowinterval) + "\" /> Sec.</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Max Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"10\" max=\"255\" step=\"1\" id=\"maxInterval\" name=\"maxInterval\" type=\"number\" value=\"" + String(config.trk_maxinterval) + "\" /> Sec.</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Min Interval:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"100\" step=\"1\" id=\"minInterval\" name=\"minInterval\" type=\"number\" value=\"" + String(config.trk_mininterval) + "\" /> Sec.</td></tr>\n";
-	html += "<tr><td style=\"text-align: right;\">Min Angle:</td><td style=\"text-align: left;\"><input size=\"3\" min=\"1\" max=\"359\" step=\"1\" id=\"minAngle\" name=\"minAngle\" type=\"number\" value=\"" + String(config.trk_minangle) + "\" /> Degree.</td></tr>\n";
+	html += "<div class=\"dash-field\"><label>Stop Symbol</label><div class=\"dash-field-body\">Table:<input maxlength=\"1\" size=\"1\" id=\"stopTable\" name=\"stopTable\" type=\"text\" value=\"" + String(config.trk_symstop[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"stopSymbol\" name=\"stopSymbol\" type=\"text\" value=\"" + String(config.trk_symstop[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"stopImgSymbol\" onclick=\"openWindowSymbol(2);\" src=\"/icon.png?c=" + String((int)config.trk_symstop[1]) + "&t=" + table + "\"> <span class=\"dash-hint\">Click icon to select the STOP symbol</span></div></div>\n";
 
-	html += "</table></fieldset></tr></table><br />\n";
-	html += "<div><button type='submit' id='submitTRACKER'  name=\"commitTRACKER\"> Apply Change </button></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"hspeed\">High Speed</label><div class=\"dash-field-body\"><input size=\"3\" min=\"10\" max=\"1000\" step=\"1\" id=\"hspeed\" name=\"hspeed\" type=\"number\" value=\"" + String(config.trk_hspeed) + "\" /> km/h</div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"lspeed\">Low Speed</label><div class=\"dash-field-body\"><input size=\"3\" min=\"1\" max=\"250\" step=\"1\" id=\"lspeed\" name=\"lspeed\" type=\"number\" value=\"" + String(config.trk_lspeed) + "\" /> km/h</div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"slowInterval\">Slow Interval</label><div class=\"dash-field-body\"><input size=\"3\" min=\"60\" max=\"3600\" step=\"1\" id=\"slowInterval\" name=\"slowInterval\" type=\"number\" value=\"" + String(config.trk_slowinterval) + "\" /> Sec.</div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"maxInterval\">Max Interval</label><div class=\"dash-field-body\"><input size=\"3\" min=\"10\" max=\"255\" step=\"1\" id=\"maxInterval\" name=\"maxInterval\" type=\"number\" value=\"" + String(config.trk_maxinterval) + "\" /> Sec.</div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"minInterval\">Min Interval</label><div class=\"dash-field-body\"><input size=\"3\" min=\"1\" max=\"100\" step=\"1\" id=\"minInterval\" name=\"minInterval\" type=\"number\" value=\"" + String(config.trk_mininterval) + "\" /> Sec.</div></div>\n";
+	html += "<div class=\"dash-field\"><label for=\"minAngle\">Min Angle</label><div class=\"dash-field-body\"><input size=\"3\" min=\"1\" max=\"359\" step=\"1\" id=\"minAngle\" name=\"minAngle\" type=\"number\" value=\"" + String(config.trk_minangle) + "\" /> Degree.</div></div>\n";
+
+	html += "</fieldset>\n";
+	html += "</div>\n"; // .dash-panel
+
+	html += "<div class=\"dash-form-actions\"><button type='submit' id='submitTRACKER' name=\"commitTRACKER\">Apply Change</button></div>\n";
 	html += "<input type=\"hidden\" name=\"commitTRACKER\"/>\n";
-	html += "</form><br />";
+	html += "</form>\n";
+	html += "</div>\n"; // .dash
 	server.send(200, "text/html", html); // send to someones browser when asked
 }
 

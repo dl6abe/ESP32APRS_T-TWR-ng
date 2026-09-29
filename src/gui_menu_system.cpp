@@ -90,6 +90,7 @@ void on_display_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -99,6 +100,7 @@ void on_display_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             cbDim.isSelect = false;
             cbContrast.isSelect = false;
             cbStartup.isSelect = false;
@@ -119,10 +121,13 @@ void on_display_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 delay(10);
@@ -228,8 +233,19 @@ void on_information_selected(MenuItem *p_menu_item)
     display.display();
     if (p_menu_item != NULL)
     {
+        // Was an unconditional wait with no timeout at all - this function
+        // blocks the entire GUI task (including the CON_MENU 60s idle
+        // timeout in gui_lcd.cpp, which never gets a chance to run while
+        // stuck here), so selecting "Information" and then not pressing
+        // anything left the screen stuck forever instead of returning to
+        // the home screen. Found live 2026-09-29 (user report).
+        unsigned long infoTimeout = millis();
         while (digitalRead(keyPush) == HIGH)
+        {
             delay(10);
+            if (guiIdleTimedOut(infoTimeout))
+                break;
+        }
     }
 }
 
@@ -357,8 +373,17 @@ void on_wifistatus_selected(MenuItem *p_menu_item)
     display.print("GW: ");
     display.print(WiFi.gatewayIP());
     display.display();
-    while (digitalRead(keyPush) == HIGH)
-        delay(10);
+    // Same unconditional-wait bug as on_information_selected() above - see
+    // that comment.
+    {
+        unsigned long infoTimeout = millis();
+        while (digitalRead(keyPush) == HIGH)
+        {
+            delay(10);
+            if (guiIdleTimedOut(infoTimeout))
+                break;
+        }
+    }
 }
 
 void on_txbeacon_selected(MenuItem *p_menu_item)

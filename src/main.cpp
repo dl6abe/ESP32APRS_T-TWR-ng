@@ -509,7 +509,17 @@ char *htmlBuffer;
 void setup()
 {
   initVersion();
+  // systemUptime is RTC_DATA_ATTR, which survives the RTS-pin/software reset
+  // esptool uses after flashing (only a true power-on reset clears it) - the
+  // "if (systemUptime == 0)" first-NTP-sync capture further down (main loop)
+  // silently no-ops if a stale non-zero value survived from before this
+  // boot, so the dashboard/OLED uptime keeps counting from a previous boot
+  // instead of this one. Force it back to 0 on every real boot so that
+  // capture always fires fresh.
+  systemUptime = 0;
   aprsClientMutex = xSemaphoreCreateMutex(); // before any task that touches aprsClient starts
+  logInit();                                 // before any task that calls projLog() starts
+  consoleLogInit();                          // before any task that calls projLog() starts (web_console.cpp)
   byte *ptr;
 #ifdef BOARD_HAS_PSRAM
   pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
@@ -745,6 +755,7 @@ bool afterVoice = false;
 // convention used in npr-fw-freertos (github.com/llatva/npr-fw-freertos).
 String consoleLine;
 bool consolePromptShown = false;
+bool consoleLastWasCR = false; // suppresses a \r\n pair triggering the line twice
 void consolePoll()
 {
   if (!consolePromptShown)
@@ -755,10 +766,20 @@ void consolePoll()
   while (Serial.available())
   {
     char c = Serial.read();
-    if (c == '\r')
-      continue;
-    if (c == '\n')
+    // Accept \r, \n, or \r\n as a line ending - found 2026-09-29 live on
+    // hardware: the previous code only treated bare \n as end-of-line and
+    // silently discarded \r, so a terminal sending a bare \r on Enter (a
+    // common convention) had every command silently swallowed, with no
+    // visible reaction at all. Confirmed via a direct serial test: \r
+    // alone did nothing, \n alone and \r\n both worked.
+    if (c == '\r' || c == '\n')
     {
+      if (c == '\n' && consoleLastWasCR)
+      {
+        consoleLastWasCR = false;
+        continue; // second half of a \r\n pair - already handled by the \r
+      }
+      consoleLastWasCR = (c == '\r');
       consoleLine.trim();
       if (consoleLine.length() > 0)
       {
@@ -849,11 +870,13 @@ void consolePoll()
         }
       }
       consoleLine = "";
-      Serial.print("ready> ");
+      Serial.print("\r\nready> ");
     }
     else
     {
+      consoleLastWasCR = false; // any real character breaks a pending \r..\n pairing
       consoleLine += c;
+      Serial.write(c); // echo - some terminals don't echo locally, leaving typed input invisible
     }
   }
 }
@@ -1022,6 +1045,16 @@ void taskGPS(void *pvParameters)
       if (timeGps > 1700000000 && abs((long)(timeGps - nowTime)) > 5)
       {
         setTime(timeGps);
+        // Same first-sync capture as the NTP path (main loop) - without
+        // WiFi/NTP this is the only place systemUptime ever gets set, so on
+        // a WiFi-less GPS-only deployment it would otherwise stay 0 forever
+        // and the dashboard/OLED uptime would show the full wall-clock time
+        // as "days" instead of actual time since boot. timeGps is already
+        // local wall-clock (see getGpsTime()), matching what now() reads.
+        if (systemUptime == 0)
+        {
+          systemUptime = timeGps;
+        }
         time_t rtc = timeGps - localTZOffsetSeconds(timeGps);
         timeval tv = {rtc, 0};
         timezone tz = {0, 0}; // ignored by the actual localtime()/DST machinery - TZ env (applyTimeZone()) is what matters
@@ -1053,46 +1086,40 @@ String getPath(int idx)
   case 0: // OFF
     ret = "";
     break;
-  case 1: // DST-TRACE1
-  case 2: // DST-TRACE2
-  case 3: // DST-TRACE3
-  case 4: // DST-TRACE4
-    ret = "DST" + String(idx);
-    break;
-  case 5: // TRACE1-1
+  case 1: // TRACE1-1
     ret = "TRACE1-1";
     break;
-  case 6:
+  case 2:
     ret = "TRACE2-2";
     break;
-  case 7:
+  case 3:
     ret = "TRACE3-3";
     break;
-  case 8:
+  case 4: // WIDE1-1 - default for iGate/DIGI, see PATH_DEFAULT_FIXED
     ret = "WIDE1-1";
     break;
-  case 9:
+  case 5: // WIDE1-1,WIDE2-1 - default for Tracker, see PATH_DEFAULT_MOBILE
+    ret = "WIDE1-1,WIDE2-1";
+    break;
+  case 6:
     ret = "RFONLY";
     break;
-  case 10:
+  case 7:
     ret = "RELAY";
     break;
-  case 11:
+  case 8:
     ret = "GATE";
     break;
-  case 12:
-    ret = "ECHO";
-    break;
-  case 13: // UserDefine1
+  case 9: // UserDefine1
     ret = String(config.path[0]);
     break;
-  case 14: // UserDefine2
+  case 10: // UserDefine2
     ret = String(config.path[1]);
     break;
-  case 15: // UserDefine3
+  case 11: // UserDefine3
     ret = String(config.path[2]);
     break;
-  case 16: // UserDefine4
+  case 12: // UserDefine4
     ret = String(config.path[3]);
     break;
   default:
@@ -1199,28 +1226,21 @@ void taskAPRS(void *pvParameters)
 
         tx_counter++;
         // log_d("TRACKER tx_counter=%d\t INTERVAL=%d\n", tx_counter, tx_interval);
-        //  Check interval timeout
-        if (config.trk_smartbeacon && config.trk_gps)
+        // Outside of Smart Beacon (or without a GPS fix to drive it), tx_interval
+        // must always mirror config.trk_interval - otherwise it can be left
+        // stuck at whatever Smart Beacon last computed (e.g. trk_slowinterval
+        // while stationary) for up to that many seconds after Smart Beacon gets
+        // switched off, since the "else" branches below previously only
+        // resynced it once the stale interval had already elapsed once.
+        if (!(config.trk_smartbeacon && config.trk_gps))
         {
-          if (tx_counter > tx_interval)
-          {
-            if (tx_counter > config.trk_mininterval)
-              EVENT_TX_POSITION = 4;
-          }
-          else
-          {
-            if (tx_counter >= (tx_interval + 5))
-            {
-              EVENT_TX_POSITION = 5;
-            }
-          }
-        }
-        else if (tx_counter > tx_interval)
-        {
-          EVENT_TX_POSITION = 6;
           tx_interval = config.trk_interval;
         }
-
+        // Recompute tx_interval from current speed/heading BEFORE the interval
+        // timeout check below runs, so switching Smart Beacon back on doesn't
+        // fire one immediate beacon against the stale interval it inherited
+        // from plain/fixed mode (e.g. a short test interval) before this tick
+        // gets a chance to settle it onto Slow/Max Interval.
         if (config.trk_gps && gps.speed.isValid() && gps.location.isValid() && gps.course.isValid() && (gps.hdop.hdop() < 10.0) && (gps.satellites.value() > 3))
         {
           SB_SPEED_OLD = SB_SPEED;
@@ -1247,6 +1267,28 @@ void taskAPRS(void *pvParameters)
             EVENT_TX_POSITION = 8;
             tx_interval = config.trk_interval;
           }
+        }
+
+        //  Check interval timeout
+        if (config.trk_smartbeacon && config.trk_gps)
+        {
+          if (tx_counter > tx_interval)
+          {
+            if (tx_counter > config.trk_mininterval)
+              EVENT_TX_POSITION = 4;
+          }
+          else
+          {
+            if (tx_counter >= (tx_interval + 5))
+            {
+              EVENT_TX_POSITION = 5;
+            }
+          }
+        }
+        else if (tx_counter > tx_interval)
+        {
+          EVENT_TX_POSITION = 6;
+          tx_interval = config.trk_interval;
         }
       }
 
@@ -1357,8 +1399,19 @@ void taskAPRS(void *pvParameters)
       else
         sprintf(call, "%s", incomingPacket.src.call);
 
-      char *rawP = (char *)malloc(tnc2.length());
+      // +1 and an explicit terminator: pkgListUpdate() (and everything
+      // downstream - handle_lastHeard(), gui_lcd.cpp - via strlen(pkg.raw))
+      // treats this as a null-terminated C string. Without the +1 here,
+      // this malloc had exactly zero room for a terminator, so strlen()
+      // read past the allocation into whatever adjacent heap bytes
+      // happened to be there - a heap buffer over-read, not just a logic
+      // bug, and the actual source of the "real comment + garbage tail"
+      // reports (see FORK_NOTES.md's "never trust a packet-derived length
+      // as a buffer size" - same rule, this time on the allocation size
+      // rather than a copy length).
+      char *rawP = (char *)malloc(tnc2.length() + 1);
       memcpy(rawP, tnc2.c_str(), tnc2.length());
+      rawP[tnc2.length()] = 0;
       int idx = pkgListUpdate(call, rawP, type, 0);
       free(rawP);
       if (idx > -1)
@@ -1703,7 +1756,14 @@ void taskNetwork(void *pvParameters)
         setTime(systemTime + localTZOffsetSeconds(systemTime));
         if (systemUptime == 0)
         {
-          systemUptime = time(NULL);
+          // ::now() (TimeLib), not time(NULL): systemUptime is diffed
+          // against now() at display time (webservice.cpp/gui_lcd.cpp),
+          // which is TimeLib's local-wall-clock value set just above -
+          // time(NULL) is the ESP-IDF system clock, still true UTC, so using
+          // it here made every uptime reading off by exactly the timezone
+          // offset. Explicit :: because this loop shadows now() with its own
+          // "unsigned long now = millis()" a few lines up.
+          systemUptime = ::now();
         }
         pingTimeout = millis() + 2000;
         if (config.vpn)
@@ -1775,7 +1835,14 @@ void taskNetwork(void *pvParameters)
               {
                 String info = line.substring(start_val + 1);
                 // info.toCharArray(&raw[0], info.length(), 0);
-                memcpy(raw, info.c_str(), info.length());
+                // Clamp to the fixed stack buffer's size, not the
+                // APRS-IS-server-supplied line length - an unusually long
+                // line would otherwise overflow `raw` (see FORK_NOTES.md's
+                // "never trust a packet-derived length as a buffer size").
+                size_t infoLen = info.length();
+                if (infoLen > sizeof(raw) - 1)
+                  infoLen = sizeof(raw) - 1;
+                memcpy(raw, info.c_str(), infoLen);
 
                 uint16_t type = pkgType(&raw[0]);
                 int start_dstssid = line.indexOf("-", 1); // get SSID -
@@ -1795,7 +1862,15 @@ void taskNetwork(void *pvParameters)
                   memcpy(call, src_call.c_str(), len);
                   call[14] = 0;
                   memset(raw, 0, sizeof(raw));
-                  memcpy(raw, line.c_str(), line.length());
+                  // Clamp before copying, not just terminate after: the old
+                  // code only forced raw[499]=0 afterward, which stops a
+                  // later strlen() from running off the end but does not
+                  // stop the memcpy itself from overflowing `raw` first if
+                  // line.length() >= sizeof(raw).
+                  size_t lineLen = line.length();
+                  if (lineLen > sizeof(raw) - 1)
+                    lineLen = sizeof(raw) - 1;
+                  memcpy(raw, line.c_str(), lineLen);
                   raw[sizeof(raw) - 1] = 0;
                   int idx = pkgListUpdate(call, raw, type, 1);
                   int cnt = 0;
@@ -1817,9 +1892,9 @@ void taskNetwork(void *pvParameters)
                       char strtmp[300];
                       String tnc2Raw = "";
                       if (config.aprs_ssid == 0)
-                        sprintf(strtmp, "%s>APTWR", config.aprs_mycall);
+                        sprintf(strtmp, "%s>" APRS_TOCALL, config.aprs_mycall);
                       else
-                        sprintf(strtmp, "%s-%d>APTWR", config.aprs_mycall, config.aprs_ssid);
+                        sprintf(strtmp, "%s-%d>" APRS_TOCALL, config.aprs_mycall, config.aprs_ssid);
                       tnc2Raw = String(strtmp);
                       tnc2Raw += ",RFONLY"; // fix path to rf only not send loop to inet
                       tnc2Raw += ":}";      // 3rd-party frame
@@ -1839,6 +1914,21 @@ void taskNetwork(void *pvParameters)
             // free(raw);
           }
         }
+      }
+      else if (aprsClient.connected())
+      {
+        // iGate was turned off while a connection was already open -
+        // nothing above closes it (this block simply stops running), so
+        // the socket was left dangling: aprsClient.connected() (and the
+        // OLED status bar's cloud icon, gui_lcd.cpp's topBar()) kept
+        // reporting "connected" indefinitely, until the far end eventually
+        // timed it out. Close it explicitly the moment igate_en goes
+        // false. Found live 2026-09-29 (user report: cloud icon stayed on
+        // after disabling iGate).
+        xSemaphoreTake(aprsClientMutex, portMAX_DELAY);
+        aprsClient.stop();
+        xSemaphoreGive(aprsClientMutex);
+        projLog(LOGCAT_APRS_INET, "iGate disabled - closed APRS-IS connection");
       }
 
       if (millis() > pingTimeout)

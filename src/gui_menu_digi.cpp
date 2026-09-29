@@ -99,6 +99,7 @@ void on_digi_position_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -108,6 +109,7 @@ void on_digi_position_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < max_sel; i++)
             {
                 if (i < 3)
@@ -136,10 +138,13 @@ void on_digi_position_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 if ((millis() - currentTime) > 2000)
@@ -273,6 +278,7 @@ void on_digi_function_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -282,6 +288,7 @@ void on_digi_function_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < 4; i++)
                 chkBox[i].isSelect = false;
             cbBox[0].isSelect = false;
@@ -302,10 +309,13 @@ void on_digi_function_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 ;
@@ -426,6 +436,7 @@ void on_digi_option_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -435,6 +446,7 @@ void on_digi_option_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
 
             for (i = 0; i < 2; i++)
                 cbBox[i].isSelect = false;
@@ -455,10 +467,13 @@ void on_digi_option_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 ;
@@ -583,6 +598,7 @@ void on_filter_digi_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -592,6 +608,7 @@ void on_filter_digi_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < max_sel; i++)
             {
                 chkBox[i].isSelect = false;
@@ -603,10 +620,13 @@ void on_filter_digi_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 if ((millis() - currentTime) > 2000)

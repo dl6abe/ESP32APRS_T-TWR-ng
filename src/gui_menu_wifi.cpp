@@ -84,6 +84,7 @@ void on_wifi_AP_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -93,6 +94,7 @@ void on_wifi_AP_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < 2; i++)
                 txtBox[i].isSelect = false;
             chkBoxWiFi.isSelect = false;
@@ -111,10 +113,13 @@ void on_wifi_AP_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 if ((millis() - currentTime) > 2000)
@@ -250,6 +255,7 @@ void on_wifi_Client_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -259,6 +265,7 @@ void on_wifi_Client_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < 2; i++)
                 txtBox[i].isSelect = false;
             chkBoxWiFi.isSelect = false;
@@ -277,10 +284,13 @@ void on_wifi_Client_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 if ((millis() - currentTime) > 2000)
@@ -409,6 +419,7 @@ void on_bluetooth_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -418,6 +429,7 @@ void on_bluetooth_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < 2; i++)
                 txtBox[i].isSelect = false;
             chkBoxWiFi.isSelect = false;
@@ -436,10 +448,13 @@ void on_bluetooth_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 if ((millis() - currentTime) > 2000)
@@ -563,6 +578,7 @@ void on_rfconfig_selected(MenuItem *p_menu_item)
     display.display();
     encoder0Pos = 0;
     delay(100);
+    unsigned long lastActivity = millis();
     do
     {
         if (encoder0Pos >= max_sel)
@@ -572,6 +588,7 @@ void on_rfconfig_selected(MenuItem *p_menu_item)
         if (keyPrev != encoder0Pos)
         {
             keyPrev = encoder0Pos;
+            lastActivity = millis();
             for (i = 0; i < 2; i++)
                 cbBox[i].isSelect = false;
             chkBoxRF.isSelect = false;
@@ -594,10 +611,13 @@ void on_rfconfig_selected(MenuItem *p_menu_item)
         else
         {
             delay(50);
+            if (guiIdleTimedOut(lastActivity))
+                break;
         }
         if (digitalRead(keyPush) == LOW)
         {
             currentTime = millis();
+            lastActivity = millis();
             while (digitalRead(keyPush) == LOW)
             {
                 delay(10);

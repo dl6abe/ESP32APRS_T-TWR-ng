@@ -60,11 +60,26 @@ void setMainPage()
 	webString += "<meta http-equiv=\"Expires\" content=\"0\" />\n";
 	webString += "<title>ESP32APRS_T-TWR</title>\n";
 	webString += "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\" />\n";
+	// htmx drives the Dashboard tab's auto-refreshing panels (hx-get/hx-trigger,
+	// see handle_dashboard()) - loaded once here so it survives tab switches;
+	// harmless on every other tab since it only acts on hx-* attributes.
+	webString += "<script type=\"text/javascript\" src=\"/htmx.min.js\"></script>\n";
 	webString += "<script type=\"text/javascript\">\n";
 	webString += "function loadInto(id, url, cb) {\n";
 	webString += "fetch(url).then(function (r) { return r.text(); }).then(function (html) {\n";
 	webString += "var el = document.getElementById(id);\n";
 	webString += "el.innerHTML = html;\n";
+	// #contentmain starts with an inline font-size:2pt (keeps the empty
+	// placeholder invisible before its first tab loads) - innerHTML only
+	// replaces children, never the element's own attributes, so without this
+	// it stays stuck forever and anything loaded into it that doesn't set
+	// its own explicit font-size silently inherits an unreadable 2pt.
+	webString += "el.style.fontSize = '';\n";
+	// htmx only auto-activates hx-* elements that exist at its own load time,
+	// or that it swaps in itself - content injected by our own innerHTML
+	// assignment here needs an explicit htmx.process() or its hx-get panels
+	// (Dashboard's sidebarInfo/lastHeard) never fire their first request.
+	webString += "if (window.htmx) { htmx.process(el); }\n";
 	// innerHTML never executes embedded <script> tags (unlike jQuery's
 	// .load(), which this replaces) - re-insert each one via a freshly
 	// created element so the browser actually runs it.
@@ -102,6 +117,8 @@ void setMainPage()
 	webString += "loadInto(\"contentmain\", \"/wireless\");\n";
 	webString += "} else if (tabName == 'System') {\n";
 	webString += "loadInto(\"contentmain\", \"/system\");\n";
+	webString += "} else if (tabName == 'Console') {\n";
+	webString += "loadInto(\"contentmain\", \"/console\");\n";
 	webString += "} else if (tabName == 'File') {\n";
 	webString += "loadInto(\"contentmain\", \"/file\");\n";
 	webString += "} else if (tabName == 'About') {\n";
@@ -131,6 +148,7 @@ void setMainPage()
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'VPN')\">VPN</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'Wireless')\">Wireless</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'System')\">System</button>\n";
+	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'Console')\">Console</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'File')\">File</button>\n";
 	webString += "<button class=\"nav-tabs\" onclick=\"selectTab(event, 'About')\">About</button>\n";
 	webString += "</ul>\n";
@@ -169,9 +187,48 @@ void setMainPage()
 // handler for web server request: http://IpAddress/      //
 ////////////////////////////////////////////////////////////
 
+// --- Dashboard stat-card icons (Lucide, ISC license, https://lucide.dev) ---
+// Trimmed inline SVGs (no license comment/class attr); stroke is currentColor
+// so .dash-card CSS colors the icon together with its status text.
+static const char *const ICON_RADIO = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M16.247 7.761a6 6 0 0 1 0 8.478\"/><path d=\"M19.075 4.933a10 10 0 0 1 0 14.134\"/><path d=\"M4.925 19.067a10 10 0 0 1 0-14.134\"/><path d=\"M7.753 16.239a6 6 0 0 1 0-8.478\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/></svg>";
+static const char *const ICON_SERVER = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/></svg>";
+static const char *const ICON_WIFI = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>";
+static const char *const ICON_BATTERY = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"m11 7-3 5h4l-3 5\"/><path d=\"M14.856 6H16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.935\"/><path d=\"M22 14v-4\"/><path d=\"M5.14 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2.936\"/></svg>";
+static const char *const ICON_BLUETOOTH = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"m7 7 10 10-5 5V2l5 5L7 17\"/></svg>";
+static const char *const ICON_SATELLITE = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M18 12a6 6 0 00-6-6\"/><path d=\"M2.824 10.459a8 8 0 0010.717 10.717c.558-.276.623-1.012.183-1.452l-9.448-9.448c-.44-.44-1.176-.375-1.452.183\"/><path d=\"M22 12A10 10 0 0012 2\"/><path d=\"m9 15 4-4\"/></svg>";
+static const char *const ICON_CPU = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M12 20v2\"/><path d=\"M12 2v2\"/><path d=\"M17 20v2\"/><path d=\"M17 2v2\"/><path d=\"M2 12h2\"/><path d=\"M2 17h2\"/><path d=\"M2 7h2\"/><path d=\"M20 12h2\"/><path d=\"M20 17h2\"/><path d=\"M20 7h2\"/><path d=\"M7 20v2\"/><path d=\"M7 2v2\"/><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"/><rect x=\"8\" y=\"8\" width=\"8\" height=\"8\" rx=\"1\"/></svg>";
+static const char *const ICON_TOGGLE = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><circle cx=\"15\" cy=\"12\" r=\"3\"/><rect width=\"20\" height=\"14\" x=\"2\" y=\"5\" rx=\"7\"/></svg>";
+static const char *const ICON_GLOBE = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\"/><path d=\"M2 12h20\"/></svg>";
+static const char *const ICON_CHART = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M3 3v16a2 2 0 0 0 2 2h16\"/><path d=\"M18 17V9\"/><path d=\"M13 17V5\"/><path d=\"M8 17v-3\"/></svg>";
+static const char *const ICON_DRIVE = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M10 16h.01\"/><path d=\"M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/><path d=\"M21.946 12.013H2.054\"/><path d=\"M6 16h.01\"/></svg>";
+static const char *const ICON_CLOCK = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg>";
+static const char *const ICON_PIN = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" ><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/></svg>";
+
+// Builds one dashboard/sidebar stat tile: icon + label + value. statusClass
+// is "" for a neutral tile or "ok"/"off" to tint it green/gray - replaces the
+// per-row inline background-color styling the old tables used for the same
+// on/off/connected states.
+static String dashCard(const char *icon, const String &label, const String &value, const char *statusClass = "")
+{
+	String html = "<article class=\"dash-card";
+	if (statusClass[0])
+	{
+		html += " ";
+		html += statusClass;
+	}
+	html += "\"><div class=\"dash-card-icon\">";
+	html += icon;
+	html += "</div><div class=\"dash-card-body\"><span class=\"dash-card-label\">";
+	html += label;
+	html += "</span><span class=\"dash-card-value\">";
+	html += value;
+	html += "</span></div></article>\n";
+	return html;
+}
+
 void handle_css()
 {
-	const char* css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}\n";
+	const char* css = ".container{width:800px;text-align:left;margin:auto;border-radius:10px 10px 10px 10px;-moz-border-radius:10px 10px 10px 10px;-webkit-border-radius:10px 10px 10px 10px;-khtml-border-radius:10px 10px 10px 10px;-ms-border-radius:10px 10px 10px 10px;box-shadow:3px 3px 3px #707070;background:#fff;border-color: #2194ec;padding: 0px;border-width: 5px;border-style:solid;}body,font{font:12px verdana,arial,sans-serif;color:#fff}.header{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;text-align:left;padding:5px 0;border-radius:10px 10px 0 0;-moz-border-radius:10px 10px 0 0;-webkit-border-radius:10px 10px 0 0;-khtml-border-radius:10px 10px 0 0;-ms-border-radius:10px 10px 0 0}.content{margin:0 0 0 166px;padding:1px 5px 5px;color:#000;background:#fff;text-align:center;font-size: 8pt;}.contentwide{padding:50px 5px 5px;color:#000;background:#fff;text-align:center}.contentwide h2{color:#000;font:1em verdana,arial,sans-serif;text-align:center;font-weight:700;padding:0;margin:0;font-size: 12pt;}.footer{background:#2194ec;text-decoration:none;color:#fff;font-family:verdana,arial,sans-serif;font-size:9px;text-align:center;padding:10px 0;border-radius:0 0 10px 10px;-moz-border-radius:0 0 10px 10px;-webkit-border-radius:0 0 10px 10px;-khtml-border-radius:0 0 10px 10px;-ms-border-radius:0 0 10px 10px;clear:both}#tail{height:450px;width:805px;overflow-y:scroll;overflow-x:scroll;color:#0f0;background:#000}table{vertical-align:middle;text-align:center;empty-cells:show;padding-left:3;padding-right:3;padding-top:3;padding-bottom:3;border-collapse:collapse;border-color:#0f07f2;border-style:solid;border-spacing:0px;border-width:3px;text-decoration:none;color:#fff;background:#000;font-family:verdana,arial,sans-serif;font-size : 12px;width:100%;white-space:nowrap}table th{font-size: 10pt;font-family:lucidia console,Monaco,monospace;text-shadow:1px 1px #0e038c;text-decoration:none;background:#0525f7;border:1px solid silver}table tr:nth-child(even){background:#f7f7f7}table tr:nth-child(odd){background:#eeeeee}table td{color:#000;font-family:lucidia console,Monaco,monospace;text-decoration:none;border:1px solid #010369}body{background:#edf0f5;color:#000}a{text-decoration:none}a:link,a:visited{text-decoration:none;color:#0000e0;font-weight:400}th:last-child a.tooltip:hover span{left:auto;right:0}ul{padding:5px;margin:10px 0;list-style:none;float:left}ul li{float:left;display:inline;margin:0 10px}ul li a{text-decoration:none;float:left;color:#999;cursor:pointer;font:900 14px/22px arial,Helvetica,sans-serif}ul li a span{margin:0 10px 0 -10px;padding:1px 8px 5px 18px;position:relative;float:left}h1{text-shadow:2px 2px #303030;text-align:center}.toggle{position:absolute;margin-left:-9999px;visibility:hidden}.toggle+label{display:block;position:relative;cursor:pointer;outline:none}input.toggle-round-flat+label{padding:1px;width:33px;height:18px;background-color:#ddd;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:before,input.toggle-round-flat+label:after{display:block;position:absolute;}input.toggle-round-flat+label:before{top:1px;left:1px;bottom:1px;right:1px;background-color:#fff;border-radius:10px;transition:background .4s}input.toggle-round-flat+label:after{top:2px;left:2px;bottom:2px;width:16px;background-color:#ddd;border-radius:12px;transition:margin .4s,background .4s}input.toggle-round-flat:checked+label{background-color:#dd4b39}input.toggle-round-flat:checked+label:after{margin-left:14px;background-color:#dd4b39}@-moz-document url-prefix(){select,input{margin:0;padding:0;border-width:1px;font:12px verdana,arial,sans-serif}input[type=button],button,input[type=submit]{padding:0 3px;border-radius:3px 3px 3px 3px;-moz-border-radius:3px 3px 3px 3px}}.nice-select.small,.nice-select-dropdown li.option{height:24px!important;min-height:24px!important;line-height:24px!important}.nice-select.small ul li:nth-of-type(2){clear:both}.nav{margin-bottom:0;padding-left:10;list-style:none}.nav>li{position:relative;display:block}.nav>li>a{position:relative;display:block;padding:5px 10px}.nav>li>a:hover,.nav>li>a:focus{text-decoration:none;background-color:#eee}.nav>li.disabled>a{color:#999}.nav>li.disabled>a:hover,.nav>li.disabled>a:focus{color:#999;text-decoration:none;background-color:initial;cursor:not-allowed}.nav .open>a,.nav .open>a:hover,.nav .open>a:focus{background-color:#eee;border-color:#428bca}.nav .nav-divider{height:1px;margin:9px 0;overflow:hidden;background-color:#e5e5e5}.nav>li>a>img{max-width:none}.nav-tabs{border-bottom:1px solid #ddd}.nav-tabs>li{float:left;margin-bottom:-1px}.nav-tabs>li>a{margin-right:0;line-height:1.42857143;border:1px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>li>a:hover{border-color:#eee #eee #ddd}.nav-tabs>button{margin-right:0;line-height:1.42857143;border:2px solid #ddd;border-radius:10px 10px 0 0}.nav-tabs>button:hover{background-color:#25bbfc;border-color:#428bca;color:#eaf2f9;border-bottom-color:transparent;}.nav-tabs>button.active,.nav-tabs>button.active:hover,.nav-tabs>button.active:focus{color:#f7fdfd;background-color:#1aae0d;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs>li.active>a,.nav-tabs>li.active>a:hover,.nav-tabs>li.active>a:focus{color:#428bca;background-color:#e5e5e5;border:1px solid #ddd;border-bottom-color:transparent;cursor:default}.nav-tabs.nav-justified{width:100%;border-bottom:0}.nav-tabs.nav-justified>li{float:none}.nav-tabs.nav-justified>li>a{text-align:center;margin-bottom:5px}.nav-tabs.nav-justified>.dropdown .dropdown-menu{top:auto;left:auto}.nav-status{float:left;margin:0;padding:3px;width:160px;font-weight:400;min-height:600}#bar,#prgbar {background-color: #f1f1f1;border-radius: 14px}#prgbar{width:100%}#bar {background-color: #3498db;width: 0%;height: 14px}.switch{position:relative;display:inline-block;width:34px;height:16px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#f55959;-webkit-transition:.4s;transition:.4s}.slider:before{position:absolute;content:\"\";height:12px;width:12px;left:2px;bottom:2px;background-color:#fff;-webkit-transition:.4s;transition:.4s}input:checked+.slider{background-color:#5ca30a}input:focus+.slider{box-shadow:0 0 1px #5ca30a}input:checked+.slider:before{-webkit-transform:translateX(16px);-ms-transform:translateX(16px);transform:translateX(16px)}.slider.round{border-radius:34px}.slider.round:before{border-radius:50%}:root{--dash-bg:#f4f6f9;--dash-card:#fff;--dash-fg:#1c2530;--dash-muted:#5b6b7c;--dash-border:#e1e6ec;--dash-accent:#2194ec;--dash-accent-strong:#1972b8;--dash-ok:#1aae0d;--dash-ok-bg:#eafcf0;--dash-warn:#b8860a;--dash-warn-bg:#fff6e0;--dash-bad:#d6392f;--dash-bad-bg:#fdeaea;--dash-off:#98a2ad;--dash-off-bg:#f1f3f5;--dash-shadow:0 1px 3px rgba(20,30,40,.08)}@media (prefers-color-scheme:dark){:root{--dash-bg:#161a20;--dash-card:#1e242c;--dash-fg:#e7ebef;--dash-muted:#8b98a5;--dash-border:#2a313a;--dash-accent-strong:#124a80;--dash-ok-bg:#123322;--dash-warn:#e0a935;--dash-warn-bg:#332a12;--dash-bad:#e2685f;--dash-bad-bg:#3a1f1d;--dash-off:#6b7684;--dash-off-bg:#242a31;--dash-shadow:0 1px 3px rgba(0,0,0,.4)}}body{background:var(--dash-bg);color:var(--dash-fg)}.header,.footer{background:var(--dash-accent-strong)}.dash{text-align:left;background:var(--dash-bg);padding:16px;border-radius:12px;font-size:14px}.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:0 0 16px}.dash-card{display:flex;align-items:center;gap:12px;background:var(--dash-card);border:1px solid var(--dash-border);border-radius:10px;padding:12px 14px;box-shadow:var(--dash-shadow);margin:0}.dash-card-icon{flex:0 0 auto;width:28px;height:28px;color:var(--dash-accent)}.dash-card-icon svg{width:100%;height:100%}.dash-card-body{display:flex;flex-direction:column;min-width:0}.dash-card-label{font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--dash-muted)}.dash-card-value{font-size:15px;font-weight:600;color:var(--dash-fg);word-break:break-word}.dash-card.ok{background:var(--dash-ok-bg)}.dash-card.ok .dash-card-icon,.dash-card.ok .dash-card-value{color:var(--dash-ok)}.dash-card.warn{background:var(--dash-warn-bg)}.dash-card.warn .dash-card-icon,.dash-card.warn .dash-card-value{color:var(--dash-warn)}.dash-card.bad{background:var(--dash-bad-bg)}.dash-card.bad .dash-card-icon,.dash-card.bad .dash-card-value{color:var(--dash-bad)}.dash-card.off{background:var(--dash-off-bg)}.dash-card.off .dash-card-icon,.dash-card.off .dash-card-value{color:var(--dash-off)}.dash-section-title{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dash-muted);margin:20px 0 8px}.dash-section-title:first-child{margin-top:0}.dash table{background:var(--dash-card);border:1px solid var(--dash-border);border-radius:10px;overflow:hidden;box-shadow:var(--dash-shadow);margin:0 0 16px;color:var(--dash-fg)}.dash table th{background:var(--dash-accent);color:#fff}.dash table td{background:var(--dash-card);color:var(--dash-fg);border-color:var(--dash-border)}.dash table tr:nth-child(even) td{background:var(--dash-bg)}.dash-panel{background:var(--dash-card);border:1px solid var(--dash-border);border-radius:10px;padding:4px 20px;box-shadow:var(--dash-shadow);margin:0 0 16px}.dash-field{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:10px 0;border-bottom:1px solid var(--dash-border)}.dash-field:last-child{border-bottom:none}.dash-field>label:first-child{flex:0 0 170px;font-size:13px;font-weight:600;color:var(--dash-muted)}.dash-field-body{flex:1 1 260px;display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;color:var(--dash-fg)}.dash-field-body label{display:inline-flex;align-items:center;gap:4px;font-weight:400;color:var(--dash-fg)}.dash-field-body input[type=text],.dash-field-body input[type=number],.dash-field-body select{box-sizing:content-box;background:var(--dash-bg);border:1px solid var(--dash-border);border-radius:8px;padding:6px 10px;font-size:14px;color:var(--dash-fg)}.dash-field-body img{width:24px;height:24px;object-fit:contain;border-radius:4px;background:var(--dash-bg);border-color:var(--dash-border)}.dash-hint{font-size:11px;color:var(--dash-muted);flex-basis:100%}.dash-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;padding:10px 2px}.dash-checkbox-grid label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dash-fg)}.dash-form-actions{margin:0 0 24px}.dash-form-actions button,.dash-form-actions input[type=submit],.dash-field-body button{background:var(--dash-accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer}.dash-form-actions button:hover,.dash-form-actions input[type=submit]:hover,.dash-field-body button:hover{background:var(--dash-accent-strong)}fieldset.dash-filter-grp{border:1px solid var(--dash-border);border-radius:8px;padding:4px 16px 12px;margin:0 0 16px}fieldset.dash-filter-grp legend{padding:0 6px;color:var(--dash-muted);font-size:12px;text-transform:uppercase;font-weight:600}fieldset.dash-filter-grp:disabled{opacity:.5}.dash-card-action{margin-top:4px;background:var(--dash-accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer}.dash-card-action:hover{background:var(--dash-accent-strong)}.dash-card-action:disabled{opacity:.6;cursor:default}\n";
 	server.send_P(200,"text/css",css);
 }
 
@@ -181,162 +238,63 @@ void handle_dashboard()
 	{
 		return server.requestAuthentication();
 	}
-	webString = "<script type=\"text/javascript\">\n";
-	webString += "function reloadSidebarInfo() {\n";
-	webString += "loadInto(\"sidebarInfo\", \"/sidebarInfo\", function () { setTimeout(reloadSidebarInfo, 10000); });\n";
-	webString += "}\n";
-	webString += "setTimeout(reloadSidebarInfo, 200);\n";
-	webString += "function reloadlastHeard() {\n";
-	webString += "loadInto(\"lastHeard\", \"/lastHeard\", function () { setTimeout(reloadlastHeard, 10000); });\n";
-	webString += "}\n";
-	webString += "setTimeout(reloadlastHeard, 300);\n";
-	webString += "window.dispatchEvent(new Event('resize'));\n";
-	webString += "</script>\n";
-
-	webString += "<div class=\"nav-status\">\n";
-	webString += "<div id=\"sidebarInfo\">\n";
-	webString += "</div>\n";
-	webString += "<br />\n";
-
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">Radio Info</th>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>Freq TX</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.freq_tx, 4) + " MHz</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>Freq RX</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.freq_rx, 4) + " MHz</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>H/L</td>\n";
-	if (config.rf_power)
-		webString += "<td>HIGH</td>\n";
-	else
-		webString += "<td>LOW</td>\n";
-	webString += "</tr>\n";
-	webString += "</table>\n";
-	webString += "\n";
-	webString += "<br />\n";
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">APRS SERVER</th>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>HOST</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_host) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>PORT</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.aprs_port) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "</table>\n";
-	webString += "<br />\n";
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">WiFi</th>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>MODE</td>\n";
 	String strWiFiMode = "OFF";
 	if (config.wifi_mode == WIFI_STA_FIX)
-	{
 		strWiFiMode = "STA";
-	}
 	else if (config.wifi_mode == WIFI_AP_FIX)
-	{
 		strWiFiMode = "AP";
-	}
 	else if (config.wifi_mode == WIFI_AP_STA_FIX)
-	{
 		strWiFiMode = "AP+STA";
-	}
-	webString += "<td style=\"background: #ffffff;\">" + strWiFiMode + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>SSID</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(WiFi.SSID()) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>RSSI</td>\n";
-	if (WiFi.isConnected())
-		webString += "<td style=\"background: #ffffff;\">" + String(WiFi.RSSI()) + " dBm</td>\n";
-	else
-		webString += "<td style=\"background:#606060; color:#b0b0b0;\" aria-disabled=\"true\">Disconnect</td>\n";
-	webString += "</tr>\n";
-	webString += "</table>\n";
-	webString += "<br />\n";
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">Power Info</th>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>VOLTAGE:</td>\n";
-	webString += "<td style=\"background: #ffffff;text-align: left;\">" + String(vbat, 2) + " V</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>PERCENT:</td>\n";
-	if (battPercent >= 0)
-		webString += "<td style=\"background: #ffffff;text-align: left;\">" + String(battPercent) + " %</td>\n";
-	else
-		webString += "<td style=\"background:#606060; color:#b0b0b0;\" aria-disabled=\"true\">N/A</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>SOURCE:</td>\n";
-	if (powerCharging)
-		webString += "<td style=\"background:#0b0; color:#030;text-align: left;\">CHARGING</td>\n";
-	else if (powerVbusIn)
-		webString += "<td style=\"background:#0b0; color:#030;text-align: left;\">USB</td>\n";
-	else
-		webString += "<td style=\"background:#606060; color:#b0b0b0;\" aria-disabled=\"true\">BATTERY</td>\n";
-	webString += "</tr>\n";
-	webString += "</table>\n";
-	webString += "<br />\n";
-	webString += "<table>\n";
-	webString += "<tr>\n";
-	webString += "<th colspan=\"2\">Bluetooth</th>\n";
-	webString += "</tr>\n";
-	webString += "<td>Master</td>\n";
-	if (config.bt_master)
-		webString += "<td style=\"background:#0b0; color:#030; width:50%;\">Enabled</td>\n";
-	else
-		webString += "<td style=\"background:#606060; color:#b0b0b0;\" aria-disabled=\"true\">Disabled</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>NAME</td>\n";
-	webString += "<td style=\"background: #ffffff;\">" + String(config.bt_name) + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "<tr>\n";
-	webString += "<td>MODE</td>\n";
-	String btMode = "";
+
+	String btMode = "NONE";
 	if (config.bt_mode == 1)
-	{
 		btMode = "TNC2";
-	}
 	else if (config.bt_mode == 2)
-	{
 		btMode = "KISS";
-	}
-	else
+
+	String powerSource = "BATTERY";
+	const char *powerClass = "off";
+	if (powerCharging)
 	{
-		btMode = "NONE";
+		powerSource = "CHARGING";
+		powerClass = "ok";
 	}
-	webString += "<td style=\"background: #ffffff;\">" + btMode + "</td>\n";
-	webString += "</tr>\n";
-	webString += "<tr>\n";
-	webString += "</table>\n";
+	else if (powerVbusIn)
+	{
+		powerSource = "USB";
+		powerClass = "ok";
+	}
+
+	// The two hx-get panels below replace the old loadInto()/setTimeout polling
+	// script - htmx's own "load, every 10s" trigger does the same 10s refresh
+	// declaratively, with no per-page JS to maintain.
+	webString = "<div class=\"dash\">\n";
+	webString += "<div id=\"lastHeard\" hx-get=\"/lastHeard\" hx-trigger=\"load, every 10s\" hx-swap=\"innerHTML\"></div>\n";
+	webString += "<div id=\"sidebarInfo\" hx-get=\"/sidebarInfo\" hx-trigger=\"load, every 10s\" hx-swap=\"innerHTML\"></div>\n";
+
+	webString += "<div class=\"dash-section-title\">Radio</div>\n";
+	webString += "<div class=\"dash-grid\">\n";
+	webString += dashCard(ICON_RADIO, "FREQ TX", String(config.freq_tx, 4) + " MHz");
+	webString += dashCard(ICON_RADIO, "FREQ RX", String(config.freq_rx, 4) + " MHz");
+	webString += dashCard(ICON_RADIO, "POWER", config.rf_power ? "HIGH" : "LOW", config.rf_power ? "ok" : "");
+	webString += dashCard(ICON_SERVER, "APRS HOST", String(config.aprs_host) + ":" + String(config.aprs_port));
 	webString += "</div>\n";
 
+	webString += "<div class=\"dash-section-title\">Connectivity</div>\n";
+	webString += "<div class=\"dash-grid\">\n";
+	webString += dashCard(ICON_WIFI, "WIFI " + strWiFiMode, WiFi.isConnected() ? String(WiFi.SSID()) : "Disconnected", WiFi.isConnected() ? "ok" : "off");
+	webString += dashCard(ICON_WIFI, "RSSI", WiFi.isConnected() ? String(WiFi.RSSI()) + " dBm" : "-", WiFi.isConnected() ? "" : "off");
+	webString += dashCard(ICON_BLUETOOTH, "BLUETOOTH " + String(config.bt_name), config.bt_master ? btMode : "Disabled", config.bt_master ? "ok" : "off");
 	webString += "</div>\n";
-	webString += "\n";
-	webString += "<div class=\"content\">\n";
-	// webString += "<b>LAST HEARD</b>\n";
-	webString += "<div id=\"lastHeard\">\n";
+
+	webString += "<div class=\"dash-section-title\">Power</div>\n";
+	webString += "<div class=\"dash-grid\">\n";
+	webString += dashCard(ICON_BATTERY, "VOLTAGE", String(vbat, 2) + " V");
+	webString += dashCard(ICON_BATTERY, "CHARGE", battPercent >= 0 ? String(battPercent) + " %" : "N/A");
+	webString += dashCard(ICON_BATTERY, "SOURCE", powerSource, powerClass);
 	webString += "</div>\n";
+
+	webString += "</div>\n"; // .dash
 
 	server.send(200, "text/html", webString); // send to someones browser when asked
 	delay(100);
@@ -349,138 +307,104 @@ void handle_sidebar()
 	{
 		return server.requestAuthentication();
 	}
-	String html = "<table>\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">System Info</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	time_t tn = now() - systemUptime;
-	String uptime = String(day(tn) - 1, DEC) + "D " + String(hour(tn), DEC) + ":" + String(minute(tn), DEC);
-	html += "<td>UPTIME:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + uptime + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>RAM:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String((int)(ESP.getFreeHeap() / 1000)) + "/" + String((int)(ESP.getHeapSize() / 1000)) + " KB</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>PSRAM:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String((int)(ESP.getFreePsram() / 1000)) + "/" + String((int)(ESP.getPsramSize() / 1000)) + " KB</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>SD:</td>\n";
+	// Pure elapsed-seconds duration math, not TimeLib's day()/hour()/minute() -
+	// those extract calendar-of-epoch fields from an absolute timestamp, which
+	// only looked right here by coincidence (epoch day 1 = Jan 1st) for the
+	// first ~31 days of uptime, then wrapped back down once the device had
+	// been running longer than that - bad for hardware meant to run unattended
+	// for months (see FORK_NOTES.md).
+	time_t uptimeSec = now() - systemUptime;
+	uint32_t upDays = uptimeSec / 86400;
+	uint32_t upHours = (uptimeSec % 86400) / 3600;
+	uint32_t upMinutes = (uptimeSec % 3600) / 60;
+	String uptime = String(upDays) + "d " + String(upHours) + "h " + String(upMinutes) + "m";
+	bool sdPresent = SD.cardType() != CARD_NONE;
 	uint32_t cardTotal = SD.totalBytes() / (1024 * 1024);
 	uint32_t cardUsed = SD.usedBytes() / (1024 * 1024);
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(cardUsed) + "/" + String(cardTotal) + " MB</td>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
-	html += "<br />\n";
-	html += "<table style=\"background:white;border-collapse: unset;\">\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">Modes Enabled</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	if (config.igate_en)
-		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">IGATE</th>\n";
-	else
-		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">IGATE</th>\n";
 
-	if (config.digi_en)
-		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">DIGI</th>\n";
-	else
-		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">DIGI</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	if (config.trk_en)
-		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">TRACKER</th>\n";
-	else
-		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">TRACKER</th>\n";
-	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\">SAT</th>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
-	html += "<br />\n";
-	html += "<table style=\"background:white;border-collapse: unset;\">\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">Network Status</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
 	xSemaphoreTake(aprsClientMutex, portMAX_DELAY);
 	bool aprsIsConnected = aprsClient.connected();
 	xSemaphoreGive(aprsClientMutex);
-	if (aprsIsConnected == true)
-		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">APRS-IS</th>\n";
-	else
-		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">APRS-IS</th>\n";
-	if (wireguard_active() == true)
-		html += "<th style=\"background:#0b0; color:#030; width:50%;border-radius: 10px;border: 2px solid white;\">VPN</th>\n";
-	else
-		html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">VPN</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">4G LTE</th>\n";
-	html += "<th style=\"background:#606060; color:#b0b0b0;border-radius: 10px;border: 2px solid white;\" aria-disabled=\"true\">MQTT</th>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
-	html += "<br />\n";
-	html += "<table>\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">STATISTICS</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">PACKET RX:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.rxCount) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">PACKET TX:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.txCount) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">RF2INET:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.rf2inet) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">INET2RF:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.inet2rf) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">DIGI:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.digiCount) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td style=\"width: 60px;text-align: right;\">DROP/ERR:</td>\n";
-	html += "<td style=\"background: #ffffff;\">" + String(status.dropCount) + "/" + String(status.errorCount) + "</td>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
-	html += "<br />\n";
-	html += "<table>\n";
-	html += "<tr>\n";
-	html += "<th colspan=\"2\">GPS Info</th>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>LAT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lat(), 5) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>LON:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.location.lng(), 5) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>ALT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.altitude.meters(), 1) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>SAT:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.satellites.value()) + "</td>\n";
-	html += "</tr>\n";
-	html += "<tr>\n";
-	html += "<td>HDOP:</td>\n";
-	html += "<td style=\"background: #ffffff;text-align: left;\">" + String(gps.hdop.hdop(), 1) + "</td>\n";
-	html += "</tr>\n";
-	html += "</table>\n";
+	bool vpnActive = wireguard_active();
 
-	html += "<script>\n";
-	html += "window.dispatchEvent(new Event('resize'));\n";
-	html += "</script>\n";
+	String html = "<div class=\"dash-section-title\">System</div>\n";
+	html += "<div class=\"dash-grid\">\n";
+	html += dashCard(ICON_CLOCK, "UPTIME", uptime);
+	html += dashCard(ICON_CPU, "RAM", String((int)(ESP.getFreeHeap() / 1000)) + "/" + String((int)(ESP.getHeapSize() / 1000)) + " KB");
+	html += dashCard(ICON_CPU, "PSRAM", String((int)(ESP.getFreePsram() / 1000)) + "/" + String((int)(ESP.getPsramSize() / 1000)) + " KB");
+	html += "</div>\n";
+
+	html += "<div class=\"dash-section-title\">Modes &amp; Status</div>\n";
+	html += "<div class=\"dash-grid\">\n";
+	html += dashCard(ICON_TOGGLE, "IGATE", config.igate_en ? "Enabled" : "Disabled", config.igate_en ? "ok" : "off");
+	html += dashCard(ICON_TOGGLE, "DIGI", config.digi_en ? "Enabled" : "Disabled", config.digi_en ? "ok" : "off");
+	// SmartTracker (issue #31): shows the *toggle* state only - "Smart
+	// Enabled" here does not yet mean it's actually auto-transmitting right
+	// now (the WiFi-loss auto-trigger isn't implemented), just that both
+	// switches are on.
+	String trackerState = "Disabled";
+	const char *trackerClass = "off";
+	if (config.trk_en)
+	{
+		trackerState = config.trk_smarttracker ? "Smart Enabled" : "Enabled";
+		trackerClass = "ok";
+	}
+	// Custom markup (not dashCard()) - needs to embed the "Send Beacon Now"
+	// button inside the card body (issue #33: moved here from its own
+	// Dashboard button so it sits next to the state it acts on).
+	html += "<article class=\"dash-card";
+	if (trackerClass[0])
+	{
+		html += " ";
+		html += trackerClass;
+	}
+	html += "\"><div class=\"dash-card-icon\">";
+	html += ICON_TOGGLE;
+	html += "</div><div class=\"dash-card-body\"><span class=\"dash-card-label\">TRACKER</span><span class=\"dash-card-value\">";
+	html += trackerState;
+	html += "</span>";
+	if (config.trk_en)
+	{
+		html += "<button class=\"dash-card-action\" onclick=\"fetch('/trackerSendBeacon').then(r=>r.text()).then(t=>{if(t!=='OK')alert(t);}).catch(e=>alert('Error: '+e));\">Send Beacon Now</button>";
+	}
+	html += "</div></article>\n";
+	html += dashCard(ICON_GLOBE, "APRS-IS", aprsIsConnected ? "Connected" : "Disconnected", aprsIsConnected ? "ok" : "off");
+	html += dashCard(ICON_GLOBE, "VPN", vpnActive ? "Connected" : "Disconnected", vpnActive ? "ok" : "off");
+	html += dashCard(ICON_DRIVE, "SD CARD", sdPresent ? String(cardUsed) + "/" + String(cardTotal) + " MB" : "Not available", sdPresent ? "" : "off");
+	html += "</div>\n";
+
+	html += "<div class=\"dash-section-title\">Statistics</div>\n";
+	html += "<div class=\"dash-grid\">\n";
+	html += dashCard(ICON_CHART, "PACKET RX", String(status.rxCount));
+	html += dashCard(ICON_CHART, "PACKET TX", String(status.txCount));
+	html += dashCard(ICON_CHART, "RF &gt; INET", String(status.rf2inet));
+	html += dashCard(ICON_CHART, "INET &gt; RF", String(status.inet2rf));
+	html += dashCard(ICON_CHART, "DIGI", String(status.digiCount));
+	html += dashCard(ICON_CHART, "DROP/ERR", String(status.dropCount) + "/" + String(status.errorCount), (status.dropCount + status.errorCount) > 0 ? "off" : "");
+	html += "</div>\n";
+
+	html += "<div class=\"dash-section-title\">GPS</div>\n";
+	html += "<div class=\"dash-grid\">\n";
+	html += dashCard(ICON_PIN, "LAT", String(gps.location.lat(), 5));
+	html += dashCard(ICON_PIN, "LON", String(gps.location.lng(), 5));
+	html += dashCard(ICON_PIN, "ALT", String(gps.altitude.meters(), 1) + " m");
+	html += dashCard(ICON_SATELLITE, "SATELLITES", String(gps.satellites.value()), gps.satellites.value() > 0 ? "ok" : "off");
+	// HDOP color tiers: <=2 ideal/excellent, <=5 good (still fine for APRS),
+	// <=10 moderate, >10 fair/poor - matches this project's own "usable fix"
+	// threshold of hdop<10 used elsewhere (main.cpp/beacon_builder.cpp).
+	double hdop = gps.hdop.hdop();
+	const char *hdopClass;
+	if (!gps.location.isValid())
+		hdopClass = "off";
+	else if (hdop <= 5.0)
+		hdopClass = "ok";
+	else if (hdop <= 10.0)
+		hdopClass = "warn";
+	else
+		hdopClass = "bad";
+	html += dashCard(ICON_SATELLITE, "HDOP", gps.location.isValid() ? String(hdop, 1) : "N/A", hdopClass);
+	html += "</div>\n";
+
 	server.send(200, "text/html", html); // send to someones browser when asked
 	delay(100);
 	html.clear();
@@ -545,6 +469,7 @@ void webService()
 	server.on("/igate", handle_igate);
 	server.on("/digi", handle_digi);
 	server.on("/tracker", handle_tracker);
+	server.on("/trackerSendBeacon", handle_trackerSendBeacon);
 	server.on("/system", handle_system);
 	server.on("/symbol", handle_symbol);
 	server.on("/icon.png", handle_symbol_icon);
@@ -556,6 +481,9 @@ void webService()
 	server.on("/sidebarInfo", handle_sidebar);
 	server.on("/lastHeard", handle_lastHeard);
 	server.on("/style.css", handle_css);
+	server.on("/htmx.min.js", handle_htmx_js);
+	server.on("/console", handle_console);
+	server.on("/consoleLog", handle_consoleLog);
 	server.on("/configBackup", handle_configBackup);
 	server.on(
 		"/configRestore", HTTP_POST, handle_configRestore,
@@ -603,7 +531,7 @@ void webService()
 				updateAuthorized = server.authenticate(config.http_username, config.http_password);
 				if (!updateAuthorized)
 					return;
-				Serial.printf("Firmware Update FILE: %s\n", upload.filename.c_str());
+				Serial.printf("Firmware Update FILE: %s\r\n", upload.filename.c_str());
 				if (!Update.begin(UPDATE_SIZE_UNKNOWN))
 				{ // start with max available size
 					Update.printError(Serial);

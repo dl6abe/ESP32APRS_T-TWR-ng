@@ -69,7 +69,7 @@ void sendDeviceInfo()
     xSemaphoreGive(aprsClientMutex);
     return;
   }
-  String status = "DL6ABE>APTWR:>Device: DL6ABE: ESP32APRS T-TWR+ iGate/Digi/Tracker V" + String(VERSION) + String(VERSION_BUILD);
+  String status = "DL6ABE>" APRS_TOCALL ":>Device: DL6ABE: ESP32APRS T-TWR+ iGate/Digi/Tracker V" + String(VERSION) + String(VERSION_BUILD);
   size_t wrote = aprsClient.println(status);
   IPAddress remoteIp = aprsClient.remoteIP();
   xSemaphoreGive(aprsClientMutex);
@@ -114,9 +114,9 @@ void sendDeviceTelemetry()
   // i.e. val = (voltage - 3.0) * 200, clamped to a 0-255 byte), channel 2 =
   // battery percent (0-100, sent as-is). Channels 3-5 unused. Digital bit 1
   // = charging, bit 2 = USB/external power present.
-  aprsClient.println(myStation + ">APTWR::" + addressee + ":PARM.Voltage,Percent");
-  aprsClient.println(myStation + ">APTWR::" + addressee + ":UNIT.V,%");
-  aprsClient.println(myStation + ">APTWR::" + addressee + ":EQNS.0,0.005,3.0,0,1,0");
+  aprsClient.println(myStation + ">" APRS_TOCALL "::" + addressee + ":PARM.Voltage,Percent");
+  aprsClient.println(myStation + ">" APRS_TOCALL "::" + addressee + ":UNIT.V,%");
+  aprsClient.println(myStation + ">" APRS_TOCALL "::" + addressee + ":EQNS.0,0.005,3.0,0,1,0");
 
   int a1 = (int)((vbat - 3.0) * 200);
   if (a1 < 0)
@@ -134,7 +134,7 @@ void sendDeviceTelemetry()
   snprintf(seqStr, sizeof(seqStr), "%03d", deviceTlmSeq % 1000);
   deviceTlmSeq++;
 
-  String tlm = myStation + ">APTWR:T#" + seqStr + "," + String(a1) + "," + String(a2) + ",0,0,0," + String(bits);
+  String tlm = myStation + ">" APRS_TOCALL ":T#" + seqStr + "," + String(a1) + "," + String(a2) + ",0,0,0," + String(bits);
   size_t wrote = aprsClient.println(tlm);
   xSemaphoreGive(aprsClientMutex);
   projLog(LOGCAT_APRS_INET, "Sent telemetry (%d/%d bytes): %s", (int)wrote, tlm.length() + 2, tlm.c_str());
@@ -208,16 +208,16 @@ String sendIsAckMsg(String toCallSign, char *msgId)
 
   String path = getPath(config.igate_path); // config.igate_path is a numeric index, not a string - must go through getPath() before use in "%s"
   if (config.aprs_ssid > 0)
-    snprintf(str, sizeof(str), "%s-%d>APTWR,%s::%s:ack%s", config.aprs_mycall, config.aprs_ssid, path.c_str(), call, msgId);
+    snprintf(str, sizeof(str), "%s-%d>" APRS_TOCALL ",%s::%s:ack%s", config.aprs_mycall, config.aprs_ssid, path.c_str(), call, msgId);
   else
-    snprintf(str, sizeof(str), "%s>APTWR,%s::%s:ack%s", config.aprs_mycall, path.c_str(), call, msgId);
+    snprintf(str, sizeof(str), "%s>" APRS_TOCALL ",%s::%s:ack%s", config.aprs_mycall, path.c_str(), call, msgId);
   return String(str);
 }
 
 void sendIsPkg(char *raw)
 {
   char str[500];
-  sprintf(str, "%s-%d>APTWR%s:%s", config.aprs_mycall, config.aprs_ssid, VERSION, raw);
+  sprintf(str, "%s-%d>" APRS_TOCALL "%s:%s", config.aprs_mycall, config.aprs_ssid, VERSION, raw);
   String tnc2Raw = String(str);
   xSemaphoreTake(aprsClientMutex, portMAX_DELAY);
   if (aprsClient.connected())
@@ -243,9 +243,9 @@ void sendIsPkgMsg(char *raw)
     call[i] = 0x20;
 
   if (config.aprs_ssid == 0)
-    sprintf(str, "%s>APTWR::%s:%s", config.aprs_mycall, call, raw);
+    sprintf(str, "%s>" APRS_TOCALL "::%s:%s", config.aprs_mycall, call, raw);
   else
-    sprintf(str, "%s-%d>APTWR::%s:%s", config.aprs_mycall, config.aprs_ssid, call, raw);
+    sprintf(str, "%s-%d>" APRS_TOCALL "::%s:%s", config.aprs_mycall, config.aprs_ssid, call, raw);
 
   String tnc2Raw = String(str);
   xSemaphoreTake(aprsClientMutex, portMAX_DELAY);

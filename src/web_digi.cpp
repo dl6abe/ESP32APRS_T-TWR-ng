@@ -331,29 +331,19 @@ void handle_digi()
 		html += "</script>\n";
 
 		/************************ DIGI Mode **************************/
+		html += "<div class=\"dash\">\n";
 		html += "<form id='formDIGI' method=\"POST\" action='#' enctype='multipart/form-data'>\n";
-		// html += "<h2>[DIGI] Digital Repeater Mode</h2>\n";
-		html += "<table>\n";
-		// html += "<tr>\n";
-		// html += "<th width=\"200\"><span><b>Setting</b></span></th>\n";
-		// html += "<th><span><b>Value</b></span></th>\n";
-		// html += "</tr>\n";
-		html += "<th colspan=\"2\"><span><b>[DIGI] Dital Repeater Mode</b></span></th>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Enable:</b></td>\n";
+		html += "<div class=\"dash-section-title\">[DIGI] Digital Repeater Mode</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String digiEnFlag = "";
 		if (config.digi_en)
 			digiEnFlag = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiEnable\" value=\"OK\" " + digiEnFlag + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Station Callsign:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"7\" size=\"6\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.digi_mycall) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Station SSID:</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"mySSID\" id=\"mySSID\">\n";
+		html += "<div class=\"dash-field\"><label>Enable</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiEnable\" value=\"OK\" " + digiEnFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"myCall\">Station Callsign</label><div class=\"dash-field-body\"><input maxlength=\"7\" size=\"9\" id=\"myCall\" name=\"myCall\" type=\"text\" value=\"" + String(config.digi_mycall) + "\" /></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"mySSID\">Station SSID</label><div class=\"dash-field-body\"><select name=\"mySSID\" id=\"mySSID\">\n";
 		for (uint8_t ssid = 0; ssid <= 15; ssid++)
 		{
 			if (config.digi_ssid == ssid)
@@ -365,58 +355,50 @@ void handle_digi()
 				html += "<option value=\"" + String(ssid) + "\">" + String(ssid) + "</option>\n";
 			}
 		}
-		html += "</select></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Station Symbol:</b></td>\n";
+		html += "</select></div></div>\n";
+
 		String table = "1";
 		if (config.digi_symbol[0] == 47)
 			table = "1";
 		if (config.digi_symbol[0] == 92)
 			table = "2";
-		html += "<td style=\"text-align: left;\">Table:<input maxlength=\"1\" size=\"1\" id=\"digiTable\" name=\"digiTable\" type=\"text\" value=\"" + String(config.digi_symbol[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"digiSymbol\" name=\"digiSymbol\" type=\"text\" value=\"" + String(config.digi_symbol[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"digiImgSymbol\" onclick=\"openWindowSymbol();\" src=\"/icon.png?c=" + String((int)config.digi_symbol[1]) + "&t=" + table + "\"> <i>*Click icon for select symbol</i></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>PATH:</b></td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"digiPath\" id=\"digiPath\">\n";
+		html += "<div class=\"dash-field\"><label>Station Symbol</label><div class=\"dash-field-body\">Table:<input maxlength=\"1\" size=\"1\" id=\"digiTable\" name=\"digiTable\" type=\"text\" value=\"" + String(config.digi_symbol[0]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> Symbol:<input maxlength=\"1\" size=\"1\" id=\"digiSymbol\" name=\"digiSymbol\" type=\"text\" value=\"" + String(config.digi_symbol[1]) + "\" style=\"background-color: rgb(97, 239, 170);\" /> <img border=\"1\" style=\"vertical-align: middle;\" id=\"digiImgSymbol\" onclick=\"openWindowSymbol();\" src=\"/icon.png?c=" + String((int)config.digi_symbol[1]) + "&t=" + table + "\"> <span class=\"dash-hint\">Click icon to select a symbol</span></div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"digiPath\">Path</label><div class=\"dash-field-body\"><select name=\"digiPath\" id=\"digiPath\">\n";
 		for (uint8_t pthIdx = 0; pthIdx < PATH_LEN; pthIdx++)
 		{
+			String pthLabel = String(PATH_NAME[pthIdx]);
+			if (pthIdx == PATH_DEFAULT_FIXED)
+				pthLabel += " (default)";
 			if (config.digi_path == pthIdx)
 			{
-				html += "<option value=\"" + String(pthIdx) + "\" selected>" + String(PATH_NAME[pthIdx]) + "</option>\n";
+				html += "<option value=\"" + String(pthIdx) + "\" selected>" + pthLabel + "</option>\n";
 			}
 			else
 			{
-				html += "<option value=\"" + String(pthIdx) + "\">" + String(PATH_NAME[pthIdx]) + "</option>\n";
+				html += "<option value=\"" + String(pthIdx) + "\">" + pthLabel + "</option>\n";
 			}
 		}
-		html += "</select></td>\n";
-		//html += "<td style=\"text-align: left;\"><input maxlength=\"72\" size=\"72\" id=\"digiPath\" name=\"digiPath\" type=\"text\" value=\"" + String(config.digi_path) + "\" /></td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Text Comment:</b></td>\n";
-		html += "<td style=\"text-align: left;\"><input maxlength=\"50\" size=\"50\" id=\"digiComment\" name=\"digiComment\" type=\"text\" value=\"" + String(config.digi_comment) + "\" /></td>\n";
-		html += "</tr>\n";
+		html += "</select></div></div>\n";
 
-		html += "<tr><td style=\"text-align: right;\"><b>Repeat Delay:</b></td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"100\" id=\"digiDelay\" name=\"digiDelay\" type=\"number\" value=\"" + String(config.digi_delay) + "\" /> mSec. <i>*0 is auto,Other random of delay time</i></td></tr>";
+		html += "<div class=\"dash-field\"><label for=\"digiComment\">Text Comment</label><div class=\"dash-field-body\"><input maxlength=\"50\" size=\"50\" id=\"digiComment\" name=\"digiComment\" type=\"text\" value=\"" + String(config.digi_comment) + "\" /></div></div>\n";
 
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Time Stamp:</b></td>\n";
+		html += "<div class=\"dash-field\"><label for=\"digiDelay\">Repeat Delay</label><div class=\"dash-field-body\"><input min=\"0\" max=\"10000\" step=\"100\" id=\"digiDelay\" name=\"digiDelay\" type=\"number\" value=\"" + String(config.digi_delay) + "\" /> mSec.<span class=\"dash-hint\">0 is auto, otherwise random delay time</span></div></div>\n";
+
 		String timeStampFlag = "";
 		if (config.digi_timestamp)
 			timeStampFlag = "checked";
-		html += "<td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></td>\n";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>Time Stamp</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiTimeStamp\" value=\"OK\" " + timeStampFlag + "><span class=\"slider round\"></span></label></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
-		html += "<tr><td align=\"right\"><b>POSITION:</b></td>\n";
-		html += "<td align=\"center\">\n";
-		html += "<table>";
+		html += "<div class=\"dash-section-title\">Position</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
 		String digiBcnEnFlag = "";
 		if (config.digi_bcn)
 			digiBcnEnFlag = "checked";
+		html += "<div class=\"dash-field\"><label>Beacon</label><div class=\"dash-field-body\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiBcnEnable\" value=\"OK\" " + digiBcnEnFlag + "><span class=\"slider round\"></span></label><label>Interval <input min=\"0\" max=\"3600\" step=\"1\" id=\"digiPosInv\" name=\"digiPosInv\" type=\"number\" value=\"" + String(config.digi_interval) + "\" /> Sec.</label></div></div>\n";
 
-		html += "<tr><td style=\"text-align: right;\">Beacon:</td><td style=\"text-align: left;\"><label class=\"switch\"><input type=\"checkbox\" name=\"digiBcnEnable\" value=\"OK\" " + digiBcnEnFlag + "><span class=\"slider round\"></span></label><label style=\"vertical-align: bottom;font-size: 8pt;\">  Interval:<input min=\"0\" max=\"3600\" step=\"1\" id=\"digiPosInv\" name=\"digiPosInv\" type=\"number\" value=\"" + String(config.digi_interval) + "\" />Sec.</label></td></tr>";
 		String digiPosFixFlag = "";
 		String digiPosGPSFlag = "";
 		String digiPos2RFFlag = "";
@@ -430,22 +412,17 @@ void handle_digi()
 			digiPos2RFFlag = "checked";
 		if (config.digi_loc2inet)
 			digiPos2INETFlag = "checked";
-		html += "<tr><td style=\"text-align: right;\">Location:</td><td style=\"text-align: left;\"><input type=\"radio\" name=\"digiPosSel\" value=\"0\" " + digiPosFixFlag + "/>Fix <input type=\"radio\" name=\"digiPosSel\" value=\"1\" " + digiPosGPSFlag + "/>GPS </td></tr>\n";
-		html += "<tr><td style=\"text-align: right;\">TX Channel:</td><td style=\"text-align: left;\"><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" " + digiPos2RFFlag + "/>RF <input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" " + digiPos2INETFlag + "/>Internet </td></tr>\n";
-		html += "<tr><td style=\"text-align: right;\">Latitude:</td><td style=\"text-align: left;\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"digiPosLat\" name=\"digiPosLat\" type=\"number\" value=\"" + String(config.digi_lat, 5) + "\" />degrees (positive for North, negative for South)</td></tr>\n";
-		html += "<tr><td style=\"text-align: right;\">Longitude:</td><td style=\"text-align: left;\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"digiPosLon\" name=\"digiPosLon\" type=\"number\" value=\"" + String(config.digi_lon, 5) + "\" />degrees (positive for East, negative for West)</td></tr>\n";
-		html += "<tr><td style=\"text-align: right;\">Altitude:</td><td style=\"text-align: left;\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"" + String(config.digi_alt, 2) + "\" /> meter. *Value 0 is not send height</td></tr>\n";
-		html += "</table></td>";
-		html += "</tr>\n";
+		html += "<div class=\"dash-field\"><label>Location Source</label><div class=\"dash-field-body\"><label><input type=\"radio\" name=\"digiPosSel\" value=\"0\" " + digiPosFixFlag + "/> Fix</label><label><input type=\"radio\" name=\"digiPosSel\" value=\"1\" " + digiPosGPSFlag + "/> GPS</label></div></div>\n";
+		html += "<div class=\"dash-field\"><label>TX Channel</label><div class=\"dash-field-body\"><label><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" " + digiPos2RFFlag + "/> RF</label><label><input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" " + digiPos2INETFlag + "/> Internet</label></div></div>\n";
+		html += "<div class=\"dash-field\"><label for=\"digiPosLat\">Latitude</label><div class=\"dash-field-body\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"digiPosLat\" name=\"digiPosLat\" type=\"number\" value=\"" + String(config.digi_lat, 5) + "\" /><span class=\"dash-hint\">degrees (positive for North, negative for South)</span></div></div>\n";
+		html += "<div class=\"dash-field\"><label for=\"digiPosLon\">Longitude</label><div class=\"dash-field-body\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"digiPosLon\" name=\"digiPosLon\" type=\"number\" value=\"" + String(config.digi_lon, 5) + "\" /><span class=\"dash-hint\">degrees (positive for East, negative for West)</span></div></div>\n";
+		html += "<div class=\"dash-field\"><label for=\"digiPosAlt\">Altitude</label><div class=\"dash-field-body\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"" + String(config.digi_alt, 2) + "\" /><span class=\"dash-hint\">meters - value 0 is not sent</span></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>PHG:</b></td>\n";
-		html += "<td align=\"center\">\n";
-		html += "<table>";
-		html += "<tr>\n";
-		html += "<td align=\"right\">Radio TX Power</td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"power\" id=\"power\">\n";
+		html += "<div class=\"dash-section-title\">PHG (Power-Height-Gain)</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+
+		html += "<div class=\"dash-field\"><label for=\"power\">Radio TX Power</label><div class=\"dash-field-body\"><select name=\"power\" id=\"power\">\n";
 		html += "<option value=\"1\" selected>1</option>\n";
 		html += "<option value=\"5\">5</option>\n";
 		html += "<option value=\"10\">10</option>\n";
@@ -455,13 +432,11 @@ void handle_digi()
 		html += "<option value=\"50\">50</option>\n";
 		html += "<option value=\"65\">65</option>\n";
 		html += "<option value=\"80\">80</option>\n";
-		html += "</select> Watts</td>\n";
-		html += "</tr>\n";
-		html += "<tr><td style=\"text-align: right;\">Antenna Gain</td><td style=\"text-align: left;\"><input size=\"3\" min=\"0\" max=\"100\" step=\"0.1\" id=\"gain\" name=\"gain\" type=\"number\" value=\"6\" /> dBi</td></tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\">Height</td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"haat\" id=\"haat\">\n";
+		html += "</select> Watts</div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"gain\">Antenna Gain</label><div class=\"dash-field-body\"><input size=\"3\" min=\"0\" max=\"100\" step=\"0.1\" id=\"gain\" name=\"gain\" type=\"number\" value=\"6\" /> dBi</div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"haat\">Height</label><div class=\"dash-field-body\"><select name=\"haat\" id=\"haat\">\n";
 		int k = 10;
 		for (uint8_t w = 0; w < 10; w++)
 		{
@@ -475,78 +450,74 @@ void handle_digi()
 			}
 			k += k;
 		}
-		html += "</select> Feet</td>\n";
-		html += "</tr>\n";
-		html += "<tr>\n";
-		html += "<td align=\"right\">Antenna/Direction</td>\n";
-		html += "<td style=\"text-align: left;\">\n";
-		html += "<select name=\"direction\" id=\"direction\">\n";
+		html += "</select> Feet</div></div>\n";
+
+		html += "<div class=\"dash-field\"><label for=\"direction\">Antenna Direction</label><div class=\"dash-field-body\"><select name=\"direction\" id=\"direction\">\n";
 		html += "<option>Omni</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option><option>N</option>\n";
-		html += "</select></td>\n";
-		html += "</tr>\n";
-		html += "<tr><td align=\"right\"><b>PHG Text</b></td><td align=\"left\"><input name=\"texttouse\" type=\"text\" size=\"6\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.digi_phg) + "\"/> <input type=\"button\" value=\"Calculate PHG\" onclick=\"javascript:calculatePHGR()\" /></td></tr>\n";
+		html += "</select></div></div>\n";
 
-		html += "</table></tr>";
-		html += "<tr>\n";
-		html += "<td align=\"right\"><b>Filter:</b></td>\n";
+		html += "<div class=\"dash-field\"><label for=\"texttouse\">PHG Text</label><div class=\"dash-field-body\"><input name=\"texttouse\" type=\"text\" size=\"6\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.digi_phg) + "\"/> <button type=\"button\" onclick=\"javascript:calculatePHGR()\">Calculate PHG</button></div></div>\n";
+		html += "</div>\n"; // .dash-panel
 
-		html += "<td align=\"center\">\n";
-		html += "<fieldset id=\"FilterGrp\">\n";
-		html += "<legend>Digipeat these types</legend>\n<table style=\"text-align:unset;border-width:0px;background:unset\">";
-		html += "<tr style=\"background:unset;\">";
+		html += "<div class=\"dash-section-title\">Filter</div>\n";
+		html += "<div class=\"dash-panel\">\n";
+		html += "<fieldset id=\"FilterGrp\" class=\"dash-filter-grp\">\n";
+		html += "<legend>Digipeat these types</legend>\n";
+		html += "<div class=\"dash-checkbox-grid\">\n";
 
 		String filterFlageEn = "";
 		if (config.digiFilter & FILTER_MESSAGE)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterMessage\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Message</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterMessage\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Message</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_STATUS)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterStatus\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Status</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterStatus\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Status</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_TELEMETRY)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Telemetry</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterTelemetry\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Telemetry</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_WX)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Weather</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterWeather\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Weather</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_OBJECT)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterObject\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Object</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterObject\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Object</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_ITEM)
 			filterFlageEn = "checked";
-		html += "</tr><tr style=\"background:unset;\"><td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterItem\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Item</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterItem\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Item</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_QUERY)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterQuery\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Query</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterQuery\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Query</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_BUOY)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterBuoy\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Buoy</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterBuoy\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Buoy</label>\n";
 
 		filterFlageEn = "";
 		if (config.digiFilter & FILTER_POSITION)
 			filterFlageEn = "checked";
-		html += "<td style=\"border:unset;\"><input class=\"field_checkbox\" name=\"FilterPosition\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/>Position</td>\n";
+		html += "<label><input class=\"field_checkbox\" name=\"FilterPosition\" type=\"checkbox\" value=\"OK\" " + filterFlageEn + "/> Position</label>\n";
 
-		html += "<td style=\"border:unset;\"></td>";
-		html += "</tr></table></fieldset>\n";
-		html += "</td></tr>\n";
-		html += "</table><br />\n";
-		html += "<div><button type='submit' id='submitDIGI'  name=\"commitDIGI\"> Apply Change </button></div>\n";
+		html += "</div>\n";
+		html += "</fieldset>\n";
+		html += "</div>\n"; // .dash-panel
+
+		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitDIGI' name=\"commitDIGI\">Apply Change</button></div>\n";
 		html += "<input type=\"hidden\" name=\"commitDIGI\"/>\n";
-		html += "</form><br />";
+		html += "</form>\n";
+		html += "</div>\n"; // .dash
 		server.send(200, "text/html", html); // send to someones browser when asked
 	}
 }

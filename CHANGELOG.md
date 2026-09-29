@@ -19,6 +19,26 @@ covers what changed for someone flashing/using the firmware.
   is superseded by a **POSIX TZ string** (e.g. `CET-1CEST,M3.5.0,M10.5.0/3`)
   for correct daylight-saving-time handling. Re-enter your time zone in the
   new format on the System page.
+- The APRS Path dropdown (iGate/DIGI/Tracker) was rebuilt: `DST-TRACE 1-4`
+  and `ECHO` were removed (not real, documented APRS digipeater aliases -
+  packets sent with them were never actually digipeated by anyone), and a
+  proper `WIDE1-1,WIDE2-1` preset was added (previously the actually-
+  recommended path only existed as UserDefine-2's factory-default text).
+  The dropdown stores a numeric index, not the path text, so **re-select
+  the Path field once on each of the iGate/DIGI/Tracker pages** after
+  updating - an old saved index now points at a different entry. New
+  defaults: iGate/DIGI → `WIDE1-1`, Tracker → `WIDE1-1,WIDE2-1` (both
+  marked "(default)" in the dropdown).
+- The AX.25 destination callsign ("Tocall") every packet identifies itself
+  with changed from `APTWR` to `APZTWR`. `APTWR` was never registered to
+  this project in the community APRS device-ID registry
+  (github.com/aprsorg/aprs-deviceid) and collided with an already-assigned
+  entry for a different, unrelated product (Byonics WXTrak) - this is why
+  aprs.fi never showed a "Device:" line for this firmware. `APZ*` is the
+  registry's own reserved prefix for experimental/unregistered software;
+  `APZTWR` is a placeholder until a real Tocall is applied for. No user
+  action needed - this only affects what's shown/matched externally, not
+  any local configuration.
 
 ### New Features 💫
 
@@ -81,3 +101,5 @@ covers what changed for someone flashing/using the firmware.
 - Switched the Bluetooth LE stack from Bluedroid to NimBLE-Arduino,
   reducing flash usage by roughly 365 KB (~18%) and RAM usage by ~18%
   with no change in Bluetooth functionality.
+- Widened the DIGI/Tracker Station Callsign input box to match iGate's
+  (same 7-character limit throughout, just a narrower box before).

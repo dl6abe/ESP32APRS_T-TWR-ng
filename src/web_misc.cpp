@@ -125,11 +125,10 @@ void handle_about()
 	sprintf(strCID, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
 
 	webString.clear();
-	webString += "<table style=\"text-align:unset;border-width:0px;background:unset\"><tr style=\"background:unset;\"><td width=\"49%\" style=\"border:unset;\">";
-
+	webString += "<div class=\"dash\">\n";
+	webString += "<div class=\"dash-section-title\">System Information</div>\n";
+	webString += "<div class=\"dash-panel\">\n";
 	webString += "<table>";
-	webString += "<th colspan=\"2\"><span><b>System Information</b></span></th>\n";
-	// webString += "<tr><th width=\"200\"><span><b>Name</b></span></th><th><span><b>Information</b></span></th></tr>";
 	webString += "<tr><td align=\"right\"><b>Hardware Version: </b></td><td align=\"left\"> LILYGO T-TWR Plus </td></tr>";
 	webString += "<tr><td align=\"right\"><b>Firmware Version: </b></td><td align=\"left\"> V" + String(VERSION) + String(VERSION_BUILD) + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>RF Analog Module: </b></td><td align=\"left\"> MODEL: " + String(RF_TYPE[config.rf_type]) + "</td></tr>\n";
@@ -139,12 +138,12 @@ void handle_about()
 	webString += "<tr><td align=\"right\"><b>Flash: </b></td><td align=\"left\">" + String(ESP.getFlashChipSize() / 1000) + " KByte</td></tr>";
 	webString += "<tr><td align=\"right\"><b>PSRAM: </b></td><td align=\"left\">" + String(ESP.getPsramSize() / 1000) + " KByte</td></tr>";
 	webString += "</table>";
-	webString += "</td><td width=\"2%\" style=\"border:unset;\"></td>";
-	webString += "<td width=\"49%\" style=\"border:unset;\">";
+	webString += "</div>\n"; // .dash-panel
 
+	webString += "<div class=\"dash-section-title\">Library Versions</div>\n";
+	webString += "<div class=\"dash-panel\">\n";
 	webString += "<table>";
 	// Kept in sync by hand with platformio.ini's lib_deps - update both together.
-	webString += "<th colspan=\"2\"><span><b>Library Versions</b></span></th>\n";
 	webString += "<tr><td align=\"right\"><b>Arduino Core: </b></td><td align=\"left\">2.0.11 (espressif32 6.4.0)</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Adafruit SSD1306: </b></td><td align=\"left\">2.5.17</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>base64: </b></td><td align=\"left\">1.4.0</td></tr>\n";
@@ -157,17 +156,13 @@ void handle_about()
 	webString += "<tr><td align=\"right\"><b>QRCode: </b></td><td align=\"left\">0.0.1</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>EspSoftwareSerial: </b></td><td align=\"left\">8.2.0</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>NimBLE-Arduino: </b></td><td align=\"left\">2.5.1</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>LibAPRS_ESP32S3: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>Adafruit GFX: </b></td><td align=\"left\">1.12.6 (vendored)</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>MenuSystem: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>Queue: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>TimeLib: </b></td><td align=\"left\">vendored (lib/)</td></tr>\n";
-
 	webString += "</table>";
-	webString += "</td></tr></table><br />";
+	webString += "</div>\n"; // .dash-panel
 
+	webString += "<div class=\"dash-section-title\">WiFi Status</div>\n";
+	webString += "<div class=\"dash-panel\">\n";
 	webString += "<table>\n";
-	webString += "<th colspan=\"2\"><span><b>WiFi Status</b></span></th>\n";
 	webString += "<tr><td align=\"right\"><b>Mode:</b></td>\n";
 	webString += "<td align=\"left\">";
 	if (config.wifi_mode == WIFI_AP_FIX)
@@ -253,15 +248,16 @@ void handle_about()
 	webString += "<td align=\"left\">" + WiFi.gatewayIP().toString() + "</td></tr>\n";
 	webString += "<tr><td align=\"right\"><b>DNS:</b></td>\n";
 	webString += "<td align=\"left\">" + WiFi.dnsIP().toString() + "</td></tr>\n";
-	webString += "</table><br /><br />\n";
+	webString += "</table>\n";
+	webString += "</div>\n"; // .dash-panel
 
 	webString += "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form' class=\"form-horizontal\">\n";
-	webString += "<table>";
-	webString += "<th colspan=\"2\"><span><b>Firmware Update</b></span></th>\n";
-	webString += "<tr><td align=\"right\"><b>File:</b></td><td align=\"left\"><input id=\"file\" name=\"update\" type=\"file\" onchange='sub(this)' /></td></tr>\n";
-	webString += "<tr><td align=\"right\"><b>Progress:</b></td><td><div id='prgbar'><div id='bar' style=\"width: 0px;\"><label id='prg'></label></div></div></td></tr>\n";
-	webString += "</table><br />\n";
-	webString += "<div class=\"col-sm-3 col-xs-4\"><input type='submit' class=\"btn btn-danger\" id=\"update_sumbit\" value='Firmware Update'></div>\n";
+	webString += "<div class=\"dash-section-title\">Firmware Update</div>\n";
+	webString += "<div class=\"dash-panel\">\n";
+	webString += "<div class=\"dash-field\"><label for=\"file\">File</label><div class=\"dash-field-body\"><input id=\"file\" name=\"update\" type=\"file\" onchange='sub(this)' /></div></div>\n";
+	webString += "<div class=\"dash-field\"><label>Progress</label><div class=\"dash-field-body\"><div id='prgbar'><div id='bar' style=\"width: 0px;\"><label id='prg'></label></div></div></div></div>\n";
+	webString += "</div>\n"; // .dash-panel
+	webString += "<div class=\"dash-form-actions\"><input type='submit' class=\"btn btn-danger\" id=\"update_sumbit\" value='Firmware Update'></div>\n";
 
 	webString += "</form>\n";
 	webString += "<script>"
@@ -291,6 +287,7 @@ void handle_about()
 				 "});"
 				 "</script>";
 
+	webString += "</div>\n"; // .dash
 	webString += "</body></html>\n";
 	server.send(200, "text/html", webString); // send to someones browser when asked
 }

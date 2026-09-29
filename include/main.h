@@ -18,6 +18,20 @@
 // VERSION/VERSION_BUILD (called first thing in setup()).
 extern char VERSION[9];
 extern char VERSION_BUILD;
+
+// AX.25 destination callsign ("Tocall") every outgoing packet identifies
+// itself with (beacons, messages, telemetry). Was the unregistered "APTWR"
+// since this project's very first commit (2023-08-01) - never assigned to
+// this project in the community APRS device-ID registry
+// (github.com/aprsorg/aprs-deviceid) and, worse, colliding with an
+// already-registered wildcard entry ("APTW??" -> Byonics WXTrak, a
+// completely unrelated weather-tracker product), which is why aprs.fi
+// never showed a "Device:" line for this firmware. "APZ*" is the
+// registry's own reserved prefix for experimental/unregistered software -
+// used here as a placeholder (2026-09-29) until a real Tocall is applied
+// for and registered upstream. One `#define` so the eventual real value
+// only needs changing here, not at every one of the ~20 call sites.
+#define APRS_TOCALL "APZTWR"
 void initVersion();
 
 // #define DEBUG
@@ -256,6 +270,11 @@ typedef struct Config_Struct
 	float trk_alt;
 	uint16_t trk_interval = 60;
 	bool trk_smartbeacon = false;
+	// SmartTracker (Gitea issue #31) - only the on/off toggle so far; the
+	// actual WiFi-loss auto-transmit behavior is not implemented yet. Not to
+	// be confused with trk_smartbeacon above (an unrelated, already-shipped
+	// dynamic-beacon-interval feature).
+	bool trk_smarttracker = false;
 	bool trk_compress = false;
 	bool trk_altitude = false;
 	bool trk_cst = false;
@@ -494,7 +513,16 @@ void smartbeacon(void);
 // __attribute__((format)) lets GCC printf-format-check callers, same as it
 // already does for log_d()/Serial.printf() elsewhere in this codebase.
 void projLog(uint16_t category, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+void logInit();         // creates projLog()'s Serial mutex; call once from setup() before any task that logs is created
 void syslogReconnect(); // (re)creates the Syslog client after config.syslog_* changes; call after saveEEPROM() on the System page
+// Web Console tab (src/web_console.cpp) - optional third projLog() sink, a
+// PSRAM ring buffer a user can start/stop from the web UI to copy debug
+// output out of the browser instead of needing a serial cable. Declared here
+// (not webservice.h) because log_output.cpp - which only includes main.h -
+// needs to call consoleLogAppend()/consoleLogActive() from projLog().
+void consoleLogInit();                                    // creates the console-log mutex; call once from setup(), like logInit()
+bool consoleLogActive();                                  // true if the ring buffer is currently recording
+void consoleLogAppend(const char *catName, const char *msg); // no-op unless consoleLogActive()
 long localTZOffsetSeconds(time_t utcTime); // DST-aware UTC offset for a given instant, per config.posixTZ
 void applyTimeZone();                      // applies config.posixTZ (TZ env + tzset()) and (re)starts NTP; call after any change
 bool isValidPosixTZ(const char *tz);       // sanity-checks a POSIX TZ string before it's stored

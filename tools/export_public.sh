@@ -30,8 +30,10 @@ fi
 
 # Files/dirs excluded from the public export beyond .gitignore, as decided
 # 2026-09-28/29: Claude Code instruction files, and this project's private
-# backlog/reasoning notes (kept only in the local/personal repo).
-EXCLUDES='^CLAUDE\.md$|^\.claude/|^Findings\.md$|^Findings_resolved\.md$|^FORK_NOTES\.md$|^ARCHITECTURE\.md$'
+# backlog/reasoning notes (kept only in the local/personal repo). LAYOUT.md
+# added 2026-09-29 - same "internal contributor doc" category as
+# ARCHITECTURE.md/FORK_NOTES.md, just created after this list was written.
+EXCLUDES='^CLAUDE\.md$|^\.claude/|^Findings\.md$|^Findings_resolved\.md$|^FORK_NOTES\.md$|^ARCHITECTURE\.md$|^LAYOUT\.md$'
 
 mkdir -p "$TARGET"
 if [ ! -d "$TARGET/.git" ]; then

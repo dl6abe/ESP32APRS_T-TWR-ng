@@ -30,6 +30,11 @@ int encoder0PosPrev = 0;
 unsigned char encoder_A = 0;
 unsigned char encoder_A_prev = 0;
 char curTab = 0;
+// Was local to mainDisp() - promoted to globals so menu-detail screens in
+// other files (gui_menu_*.cpp) can reset them via guiIdleTimedOut() below,
+// the same way mainDisp()'s own manual "back" path already does.
+uint8_t menuSel = 0;
+char curTabOld = 0;
 int posNow = 0;
 int timeHalfSec = 0;
 int line = 16;
@@ -48,6 +53,20 @@ void pushTxDisp(uint8_t ch, const char *name, char *info)
     strcpy(pkg.name, name);
     strcpy(pkg.info, info);
     queTxDisp.push(&pkg); // ใส่แพ็จเก็จจาก TNC ลงคิวบัพเฟอร์
+}
+
+// Shared idle-timeout check for every menu-detail screen (gui_menu_*.cpp)
+// and the settings-menu list itself, below - one place implementing "go
+// back to the home screen after 60s of inactivity" instead of many
+// hand-rolled copies. See Gitea issue #27.
+bool guiIdleTimedOut(unsigned long since)
+{
+    if (millis() - since < 60000UL)
+        return false;
+    conStat = CON_NORMAL;
+    menuSel = 0;
+    curTabOld = curTab + 1; // force the Dashboard tab to redraw
+    return true;
 }
 
 #define ROTARY_ENCODER_A_PIN 47
@@ -781,15 +800,36 @@ void topBar(int ws)
         display.drawBitmap(54, 2, iconClound, 12, 12, 1);
     }
 
-    if (gps.location.isValid() && (gps.hdop.hdop()<10) && (gps.satellites.value()>3))
+    // GPS icon: off with no fix at all, blinking with a fix that isn't
+    // "usable" yet (the same hdop<10 && satellites>3 threshold beacon
+    // building/SmartBeacon already gate on - see beacon_builder.cpp/main.cpp),
+    // steady on once the fix is usable.
+    if (gps.location.isValid())
     {
-        display.drawBitmap(70, 2, iconLocation, 12, 12, 1);
+        bool usableFix = (gps.hdop.hdop() < 10) && (gps.satellites.value() > 3);
+        if (usableFix || (millis() / 500) % 2 == 0)
+        {
+            display.drawBitmap(70, 2, iconLocation, 12, 12, 1);
+        }
     }
 
     if (wireguard_active())
     {
         display.drawBitmap(85, 2, iconLink, 12, 12, 1);
     }
+
+    // TEMPORARY visual test for the SmartTracker icon (Gitea issue #31/#32)
+    // - unconditional, always-blinking, so it can be checked on real
+    // hardware before the actual WiFi-loss detection logic exists. Not the
+    // real feature yet: remove this block (or replace with the real
+    // condition + rotating-slot logic) once #31/#32 are implemented.
+    // Disabled for now on request - re-enable by flipping this to #if 1.
+#if 0
+    if ((millis() / 500) % 2 == 0)
+    {
+        display.drawBitmap(85, 2, iconSmartTracker, 12, 12, 1);
+    }
+#endif
 
     display.setCursor(110, 0);
 
@@ -879,20 +919,33 @@ void IRAM_ATTR doEncoder()
     {
         _position += KNOBDIR[thisState | (_oldState << 2)];
         _oldState = thisState;
-        // Serial.printf("Key:%d\n", _position >> 2);
-        _positionExt = _position >> 2;
-        if (_positionExtPrev != _positionExt)
+
+        // Only commit a step once the knob is back at its mechanical rest
+        // position (both pins HIGH - INPUT_PULLUP wiring, pinMode() above),
+        // not on every intermediate quadrature state along the way. Without
+        // this, a small wobble near a _position/4 boundary (e.g. contact
+        // bounce, or just touching the knob without turning it to the next
+        // detent) could already cross the boundary and register a full menu
+        // step, even though the knob never reached the next click. Found
+        // live 2026-09-29 (user report: slight movement without a click
+        // already changes the selected menu element).
+        if (thisState == 3)
         {
-            if (_positionExtPrev > _positionExt)
+            // Serial.printf("Key:%d\n", _position >> 2);
+            _positionExt = _position >> 2;
+            if (_positionExtPrev != _positionExt)
             {
-                encoder0Pos--;
+                if (_positionExtPrev > _positionExt)
+                {
+                    encoder0Pos--;
+                }
+                else if (_positionExtPrev < _positionExt)
+                {
+                    encoder0Pos++;
+                }
+                _positionExtPrev = _positionExt;
+                // Serial.printf("Key:%d\n", _positionExt);
             }
-            else if (_positionExtPrev < _positionExt)
-            {
-                encoder0Pos++;
-            }
-            _positionExtPrev = _positionExt;
-            // Serial.printf("Key:%d\n", _positionExt);
         }
     }
     portEXIT_CRITICAL_ISR(&muxKey);
@@ -1097,8 +1150,8 @@ void mainDisp(void *pvParameters)
     unsigned long timeGuiOld = millis();
     timeGui = 0;
     saveTimeout = millis();
-    char curTabOld = 0;
-    uint8_t menuSel = 0;
+    curTabOld = 0;
+    menuSel = 0;
 
     pttStat = 0;
     for (;;)
@@ -1404,10 +1457,9 @@ void mainDisp(void *pvParameters)
         if (conStat == CON_MENU)
         {
             delay(10);
-            if (millis() > (menuTimeout + 60000L))
+            if (guiIdleTimedOut(menuTimeout))
             {
                 menuTimeout = millis();
-                conStat = CON_NORMAL;
                 powerSave();
             }
 

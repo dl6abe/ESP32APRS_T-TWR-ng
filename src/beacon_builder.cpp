@@ -385,9 +385,9 @@ String trk_gps_postion(String comment)
   String tnc2Raw = "";
   char strtmp[300];
   if (config.trk_ssid == 0)
-    sprintf(strtmp, "%s>APTWR", config.trk_mycall);
+    sprintf(strtmp, "%s>" APRS_TOCALL, config.trk_mycall);
   else
-    sprintf(strtmp, "%s-%d>APTWR", config.trk_mycall, config.trk_ssid);
+    sprintf(strtmp, "%s-%d>" APRS_TOCALL, config.trk_mycall, config.trk_ssid);
   tnc2Raw = String(strtmp);
   if (config.trk_path < 5)
   {
@@ -498,9 +498,9 @@ String trk_fix_position(String comment)
   }
 
   if (config.trk_ssid == 0)
-    sprintf(strtmp, "%s>APTWR", config.trk_mycall);
+    sprintf(strtmp, "%s>" APRS_TOCALL, config.trk_mycall);
   else
-    sprintf(strtmp, "%s-%d>APTWR", config.trk_mycall, config.trk_ssid);
+    sprintf(strtmp, "%s-%d>" APRS_TOCALL, config.trk_mycall, config.trk_ssid);
   tnc2Raw = String(strtmp);
   if (config.trk_path < 5)
   {
@@ -568,9 +568,9 @@ String igate_position(double lat, double lon, double alt, String comment)
     }
   }
   if (config.aprs_ssid == 0)
-    sprintf(strtmp, "%s>APTWR", config.aprs_mycall);
+    sprintf(strtmp, "%s>" APRS_TOCALL, config.aprs_mycall);
   else
-    sprintf(strtmp, "%s-%d>APTWR", config.aprs_mycall, config.aprs_ssid);
+    sprintf(strtmp, "%s-%d>" APRS_TOCALL, config.aprs_mycall, config.aprs_ssid);
   tnc2Raw = String(strtmp);
   if (config.igate_path < 5)
   {
@@ -620,9 +620,9 @@ String digi_position(double lat, double lon, double alt, String comment)
     sprintf(loc, "!%02d%02d.%02d%c%c%03d%02d.%02d%c%c", lat_dd, lat_mm, lat_ss, lat_ns, config.digi_symbol[0], lon_dd, lon_mm, lon_ss, lon_ew, config.digi_symbol[1]);
   }
   if (config.digi_ssid == 0)
-    sprintf(strtmp, "%s>APTWR", config.digi_mycall);
+    sprintf(strtmp, "%s>" APRS_TOCALL, config.digi_mycall);
   else
-    sprintf(strtmp, "%s-%d>APTWR", config.digi_mycall, config.digi_ssid);
+    sprintf(strtmp, "%s-%d>" APRS_TOCALL, config.digi_mycall, config.digi_ssid);
   tnc2Raw = String(strtmp);
   if (config.digi_path < 5)
   {

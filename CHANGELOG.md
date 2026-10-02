@@ -42,6 +42,16 @@ covers what changed for someone flashing/using the firmware.
 
 ### New Features 💫
 
+- Configuration is now stored as a versioned, name-keyed JSON file instead
+  of a raw EEPROM struct — a field being added/removed/resized no longer
+  silently wipes WiFi/APRS settings on an already-deployed device (Gitea
+  #2).
+- The System page's config restore now also accepts a raw JSON upload
+  (not just the existing backup-file format), and an offline
+  backup→JSON converter tool was added for migrating old backups.
+- A `tools/web_flash` script can now re-flash a deployed board's firmware
+  over its existing web UI (no USB/serial access needed) — useful for
+  units mounted as unattended repeaters/iGates.
 - Color APRS symbol icons on the web dashboard (previously
   black-and-white).
 - All APRS symbol icons are now served locally/offline — no more broken
@@ -69,6 +79,18 @@ covers what changed for someone flashing/using the firmware.
 
 ### Other Changes ☀️
 
+- Fixed Mic-E position reports: the status/comment text was read one byte
+  too far in (dropping its first character), and the altitude extension
+  (3 base91 digits + `}`) was only recognized right at the front of that
+  text instead of anywhere in it — on real traffic (radios that prefix it
+  with free-text status, e.g. a frequency spec), altitude was silently
+  lost and raw undecoded bytes leaked into the comment.
+- Fixed a missing null terminator when a Last-Heard packet buffer was
+  reused for a shorter packet than before — the leftover bytes from the
+  previous, longer packet could show up appended to the comment.
+- Fixed several IGATE/DIGI/Tracker page inconsistencies found via a
+  cross-page audit.
+- Updated the vendored ESP32Ping (1.6→1.7) and Queue (2.0→2.1) libraries.
 - Fixed a buffer overrun that could silently corrupt received APRS
   packets.
 - Fixed a stored XSS vulnerability: callsigns/paths from received

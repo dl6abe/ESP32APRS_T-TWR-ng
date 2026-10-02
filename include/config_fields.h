@@ -46,9 +46,16 @@ extern const size_t configFieldCount;
 String buildConfigBackup();
 // Applies key=value lines from text to `config` in place - does not call
 // saveEEPROM() or reboot, caller's responsibility. Unknown keys are
-// skipped (logged at LOGCAT_SYSTEM); fields absent from `text` are left
-// untouched (whatever `config` already held - typically defaultConfig()'s
-// values on a fresh/reset device, or the previous live values otherwise).
-void applyConfigBackup(const String &text);
+// skipped; fields absent from `text` are left untouched (whatever `config`
+// already held - typically defaultConfig()'s values on a fresh/reset
+// device, or the previous live values otherwise). A present key whose
+// value doesn't look like a number for a numeric field (isValidNumber())
+// is *also* left untouched rather than silently becoming 0 - a bad value
+// in one field shouldn't blank out a previously-good one. Always logged
+// at LOGCAT_SYSTEM; the three optional out-params additionally let a
+// caller (e.g. the web /configRestore handler) surface the same counts to
+// whoever triggered the restore, not just to the syslog.
+void applyConfigBackup(const String &text, uint16_t *appliedOut = nullptr,
+						uint16_t *unknownOut = nullptr, uint16_t *invalidOut = nullptr);
 
 #endif

@@ -21,7 +21,7 @@
 #include "sa868.h"
 
 #define SerialLOG Serial
-void on_aprsserver_selected(MenuItem *p_menu_item)
+void on_aprsserver_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 5;
     MyTextBox txtBox[3];
@@ -207,7 +207,7 @@ void on_aprsserver_selected(MenuItem *p_menu_item)
     // conStatNetwork = CON_SERVER;
 }
 
-void on_igate_position_selected(MenuItem *p_menu_item)
+void on_igate_position_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 6;
     MyTextBox txtBox[3];
@@ -400,7 +400,7 @@ void on_igate_position_selected(MenuItem *p_menu_item)
     initInterval=true;
 }
 
-void on_igate_function_selected(MenuItem *p_menu_item)
+void on_igate_function_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 5;
     MyTextBox txtBox;
@@ -429,7 +429,7 @@ void on_igate_function_selected(MenuItem *p_menu_item)
     chkBox[1].y = 18;
     sprintf(chkBox[1].text, "INET2RF");
 
-    chkBox[2].Checked = false;
+    chkBox[2].Checked = config.igate_timestamp; // was hardcoded false - screen always opened showing "unchecked" regardless of the real saved value
     chkBox[2].x = 0;
     chkBox[2].y = 29;
     sprintf(chkBox[2].text, "TIME STAMP");
@@ -566,7 +566,7 @@ void on_igate_function_selected(MenuItem *p_menu_item)
     saveEEPROM();
 }
 
-void on_igate_beacon_selected(MenuItem *p_menu_item)
+void on_igate_beacon_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 6;
     MyTextBox txtBox[2];

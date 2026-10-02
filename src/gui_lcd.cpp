@@ -513,7 +513,13 @@ void systemDisp()
 
     display.setCursor(3, 26);
     display.print("UpTIME:");
-    str = String(day(upTime) - 1, DEC) + "D " + String(hour(upTime), DEC) + ":" + String(minute(upTime), DEC) + ":" + String(second(upTime), DEC);
+    // systemUptime stays 0 until the first successful NTP/GPS time sync
+    // (main.cpp) - showing a duration computed from "now() - 0" before that
+    // gives a decades-long reading instead of a real duration (issue #50).
+    if (systemUptime == 0)
+        str = "N/A";
+    else
+        str = String(day(upTime) - 1, DEC) + "D " + String(hour(upTime), DEC) + ":" + String(minute(upTime), DEC) + ":" + String(second(upTime), DEC);
     x = str.length() * 6;
     display.setCursor(126 - x, 26);
     display.print(str);

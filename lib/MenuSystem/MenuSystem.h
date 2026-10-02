@@ -29,15 +29,20 @@ class MenuSystem;
 //!
 //! \see Menu
 //! \see MenuItem
-class MenuComponent
-{
+class MenuComponent {
     friend class MenuSystem;
     friend class Menu;
+public:
+    //! \brief Callback for when the MenuComponent is selected
+    //!
+    //! \param menu_component The menu component being selected.
+    using SelectFnPtr = void (*)(MenuComponent* menu_component);
+
 public:
     //! \brief Construct a MenuComponent
     //! \param[in] name The name of the menu component that is displayed in
     //!                 clients.
-    MenuComponent(const char* name);
+    MenuComponent(const char* name, SelectFnPtr select_fn);
 
     //! \brief Set the component's name
     //! \param[in] name The name of the menu component that is displayed in
@@ -91,6 +96,11 @@ public:
     //! \see MenuComponent::set_current
     bool is_current() const;
 
+    //! \brief Sets the function to call when the MenuItem is selected
+    //! \param[in] select_fn The function to call when the MenuItem is
+    //!                      selected.
+    void set_select_function(SelectFnPtr select_fn);
+
 protected:
     //! \brief Processes the next action
     //!
@@ -141,13 +151,16 @@ protected:
     //! MenuComponent::prev methods can be used to change some state in the
     //! component.
     //!
+    //! The default implementation calls select_fn if it's not null. Components
+    //! that derive from this class must call their parent's implementation.
+    //!
     //! \returns The Menu instance selected or nullptr. The returned Menu
     //!          instance is used in MenuSystem::activate to set the current
     //!          menu in the MenuSystem.
     //!
     //! \see MenuComponent::has_focus
     //! \see NumericMenuComponent
-    virtual Menu* select() = 0;
+    virtual Menu* select();
 
     //! \brief Set the current state of the component
     //!
@@ -160,6 +173,7 @@ protected:
     const char* _name;
     bool _has_focus;
     bool _is_current;
+    SelectFnPtr _select_fn;
 };
 
 
@@ -171,14 +185,7 @@ protected:
 //!
 //! \see MenuComponent
 //! \see Menu
-class MenuItem : public MenuComponent
-{
-public:
-    //! \brief Callback for when the MenuItem is selected
-    //!
-    //! \param menu_item The menu item being selected.
-    using SelectFnPtr = void (*)(MenuItem* menu_item);
-
+class MenuItem : public MenuComponent {
 public:
     //! \brief Construct a MenuItem
     //! \param[in] name The name of the menu component that is displayed in
@@ -186,11 +193,6 @@ public:
     //! \param[in] select_fn The function to call when the MenuItem is
     //!                      selected.
     MenuItem(const char* name, SelectFnPtr select_fn);
-
-    //! \brief Sets the function to call when the MenuItem is selected
-    //! \param[in] select_fn The function to call when the MenuItem is
-    //!                      selected.
-    void set_select_function(SelectFnPtr select_fn);
 
     //! \copydoc MenuComponent::render
     virtual void render(MenuComponentRenderer const& renderer) const;
@@ -213,15 +215,12 @@ protected:
 
     //! \copydoc MenuComponent:select
     virtual Menu* select();
-
-protected:
-    SelectFnPtr _select_fn;
 };
+
 
 //! \brief A MenuItem that calls MenuSystem::back() when selected.
 //! \see MenuItem
-class BackMenuItem : public MenuItem
-{
+class BackMenuItem : public MenuItem {
 public:
     BackMenuItem(const char* name, SelectFnPtr select_fn, MenuSystem* ms);
 
@@ -231,12 +230,11 @@ protected:
     virtual Menu* select();
 
 protected:
-    MenuSystem* menu_system;
+    MenuSystem* _menu_system;
 };
 
 
-class NumericMenuItem : public MenuItem
-{
+class NumericMenuItem : public MenuItem {
 public:
     //! \brief Callback for formatting the numeric value into a String.
     //!
@@ -245,38 +243,38 @@ public:
     using FormatValueFnPtr = const String (*)(const float value);
 
 public:
-    /// Constructor
-    ///
-    /// @param name The name of the menu item.
-    /// @param select_fn The function to call when this MenuItem is selected.
-    /// @param value Default value.
-    /// @param minValue The minimum value.
-    /// @param maxValue The maximum value.
-    /// @param increment How much the value should be incremented by.
-    /// @param valueFormatter The custom formatter. If nullptr the String float
-    ///                       formatter will be used.
+    //! Constructor
+    //!
+    //! @param name The name of the menu item.
+    //! @param select_fn The function to call when this MenuItem is selected.
+    //! @param value Default value.
+    //! @param min_value The minimum value.
+    //! @param max_value The maximum value.
+    //! @param increment How much the value should be incremented by.
+    //! @param format_value_fn The custom formatter. If nullptr the String
+    //!                        float formatter will be used.
     NumericMenuItem(const char* name, SelectFnPtr select_fn,
-                    float value, float minValue, float maxValue,
+                    float value, float min_value, float max_value,
                     float increment=1.0,
                     FormatValueFnPtr format_value_fn=nullptr);
 
-    /**
-     * Sets the custom number formatter.
-     *
-     * @param numberFormat the custom formatter. If nullptr the String float
-     *                     formatter will be used (2 decimals)
-     */
+    //!
+    //! \brief Sets the custom number formatter.
+    //!
+    //! \param numberFormat the custom formatter. If nullptr the String float
+    //!                     formatter will be used (2 decimals)
+    //!
     void set_number_formatter(FormatValueFnPtr format_value_fn);
 
     float get_value() const;
-    float get_minValue() const;
-    float get_maxValue() const;
+    float get_min_value() const;
+    float get_max_value() const;
 
-    // TODO: get_value_string is a poor name. get_formatted_value maybe?
-    String get_value_string() const;
     void set_value(float value);
     void set_min_value(float value);
     void set_max_value(float value);
+
+    String get_formatted_value() const;
 
     virtual void render(MenuComponentRenderer const& renderer) const;
 
@@ -288,21 +286,31 @@ protected:
 
 protected:
     float _value;
-    float _minValue;
-    float _maxValue;
+    float _min_value;
+    float _max_value;
     float _increment;
     FormatValueFnPtr _format_value_fn;
 };
 
 
-class Menu : public MenuComponent
-{
+//! \brief A MenuComponent that can contain other MenuComponents.
+//!
+//! Menu represents the branch in the composite design pattern (see:
+//! https://en.wikipedia.org/wiki/Composite_pattern). When a Menu is
+//! selected, the user-defined Menu::_select_fn callback is called.
+//!
+//! \see MenuComponent
+//! \see MenuItem
+class Menu : public MenuComponent {
     friend class MenuSystem;
 public:
-    Menu(const char* name);
+    Menu(const char* name, SelectFnPtr select_fn=nullptr);
 
-    void add_item(MenuItem* pItem);
-    void add_menu(Menu* pMenu);
+    //! \brief Adds a MenuItem to the Menu
+    void add_item(MenuItem* p_item);
+
+    //! \brief Adds a Menu to the Menu
+    void add_menu(Menu* p_menu);
 
     MenuComponent const* get_current_component() const;
     MenuComponent const* get_menu_component(uint8_t index) const;
@@ -311,17 +319,32 @@ public:
     uint8_t get_current_component_num() const;
     uint8_t get_previous_component_num() const;
 
+    //! \copydoc MenuComponent::render
     void render(MenuComponentRenderer const& renderer) const;
 
 protected:
-    void set_parent(Menu* pParent);
+    void set_parent(Menu* p_parent);
     Menu const* get_parent() const;
 
+    //! \brief Activates the current selection
+    //!
+    //! When a client makes a selection, activate is called on the current menu
+    //! which in turn calls the menu's current item's callback.
     Menu* activate();
+
+    //! \copydoc MenuComponent::next
     virtual bool next(bool loop=false);
+
+    //! \copydoc MenuComponent::prev
     virtual bool prev(bool loop=false);
+
+    //! \copydoc MenuComponent::select
     virtual Menu* select();
+
+    //! \copydoc MenuComponent::reset
     virtual void reset();
+
+    void add_component(MenuComponent* p_component);
 
 private:
     MenuComponent* _p_current_component;
@@ -333,8 +356,7 @@ private:
 };
 
 
-class MenuSystem
-{
+class MenuSystem {
 public:
     MenuSystem(MenuComponentRenderer const& renderer);
 
@@ -355,8 +377,7 @@ private:
 };
 
 
-class MenuComponentRenderer
-{
+class MenuComponentRenderer {
 public:
     virtual void render(Menu const& menu) const = 0;
 

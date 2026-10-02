@@ -21,7 +21,7 @@
 #include "sa868.h"
 
 #define SerialLOG Serial
-void on_smartbeacon_selected(MenuItem *p_menu_item)
+void on_smartbeacon_selected(MenuComponent *p_menu_item)
 {
     int i;
     // MyCheckBox chkBox[3];
@@ -215,7 +215,7 @@ void on_smartbeacon_selected(MenuItem *p_menu_item)
 }
 
 
-void on_tracker_position_selected(MenuItem *p_menu_item)
+void on_tracker_position_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 7;
     MyTextBox txtBox[3];
@@ -427,7 +427,7 @@ void on_tracker_position_selected(MenuItem *p_menu_item)
     initInterval=true;
 }
 
-void on_tracker_function_selected(MenuItem *p_menu_item)
+void on_tracker_function_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 8;
     // MyTextBox txtBox[2];
@@ -609,7 +609,7 @@ void on_tracker_function_selected(MenuItem *p_menu_item)
     initInterval=true;
 }
 
-void on_tracker_option_selected(MenuItem *p_menu_item)
+void on_tracker_option_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 6;
     MyTextBox txtBox[3];

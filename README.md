@@ -199,3 +199,13 @@ Items purchased hardware from AliExpress at [https://www.aliexpress.com/item/100
 Items purchased hardware from lilygo store at [https://www.lilygo.cc/products/t-twr-plus?variant=42911934185653](https://www.lilygo.cc/products/t-twr-plus?variant=42911934185653) \
 Select T-TWR Plus VHF/UHF Only. \
 `Do not use the model OpenEdition, because SA868 not working.`
+
+## Tips
+
+**Disabling the speaker (no software mute available):** The SA868 module's
+volume is controlled via `AT+DMOSETVOLUME=<1-8>` - the official SA818/SA868
+AT command range only goes down to 1, there is no 0/mute value. Volume also
+has no effect on RX/TX APRS decoding, it only controls the audible speaker
+level for a human listener. If you want the speaker fully silent, unplug
+its small cable from the board - confirmed working, no downside for
+iGate/Digi/Tracker operation.

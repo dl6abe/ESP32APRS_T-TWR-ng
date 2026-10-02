@@ -452,13 +452,25 @@ static void test_compressed_position_weather_report_is_decoded()
 
 // Regression guard for real live traffic (2026-09-29, via aprs.fi):
 // DH1GHL-9>TXTPT6,WIDE1-1,WIDE2-1,qAR,F4FXL-3:`~'Ml-E>/>"3C}144.575MHzHorst on Tour =
-// A Mic-E position report whose status text starts with the standard
-// altitude extension (3 base91 digits + '}', spec ch.10) - a different
-// encoding from the ASCII "/A=nnnnnn" extension parse_aprs_comment()
-// already handles for other packet types. The Mic-E path didn't decode it
-// at all: the 4 raw bytes leaked into the comment as undecoded noise ahead
-// of the real status text (a frequency spec + free text), and the altitude
-// was lost (F_ALT never set).
+// A Mic-E position report whose status text contains the standard altitude
+// extension (3 base91 digits + '}', spec ch.10) - a different encoding from
+// the ASCII "/A=nnnnnn" extension parse_aprs_comment() already handles for
+// other packet types. The Mic-E path didn't decode it at all: the 4 raw
+// bytes leaked into the comment as undecoded noise, and the altitude was
+// lost (F_ALT never set).
+//
+// Expected values cross-checked against the reference implementation this
+// parser was ported from (Ham::APRS::FAP's _mice_to_decimal(), see
+// https://github.com/gitpan/Ham-APRS-FAP/blob/master/FAP.pm): the
+// status/comment text starts at offset 8 into the info field (not 9 - an
+// earlier version of this fix, and this test, got that byte wrong, which is
+// why the expected comment below keeps the leading '>' that a front-only
+// offset-9 read used to swallow), and the altitude marker is searched for
+// anywhere in that text (FAP's non-greedy `(.*?)([\x21-\x7b]{3})\}(.*)`),
+// not just at its very front - real Mic-E radios commonly prefix it with
+// free-text status (here, a literal leading '>' before the frequency spec).
+// Found live 2026-09-30 (user report, e.g. SP7TBS-9 "6]}", DF4OR "_1") that
+// the offset-9 version of this fix was itself still wrong.
 static void test_mice_altitude_extension_decoded_and_stripped()
 {
 	ParseAPRS aprs;
@@ -471,7 +483,7 @@ static void test_mice_altitude_extension_decoded_and_stripped()
 	check(pb.flags & F_HASPOS, "mic-e altitude: position still decodes");
 	check(pb.flags & F_ALT, "mic-e altitude: F_ALT flag set");
 	check(within(pb.altitude, -47.0, 0.5), "mic-e altitude: altitude extension decodes to -47m");
-	checkStr(pb.comment, "144.575MHzHorst on Tour =", "mic-e altitude: altitude bytes stripped, frequency/free text preserved");
+	checkStr(pb.comment, ">144.575MHzHorst on Tour =", "mic-e altitude: altitude bytes stripped, status text preserved (leading '>' included)");
 }
 
 int main()

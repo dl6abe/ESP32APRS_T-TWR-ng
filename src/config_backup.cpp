@@ -186,7 +186,7 @@ String buildConfigBackup()
 	String out;
 	out.reserve(4096);
 	out += "# ESP32APRS T-TWR config backup\n";
-	out += "# firmware=V" + String(VERSION) + String(VERSION_BUILD) + "\n";
+	out += "# firmware=v" + String(VERSION) + String(VERSION_BUILD) + "\n";
 	for (size_t i = 0; i < configFieldCount; i++)
 	{
 		const ConfigField &f = configFields[i];
@@ -223,11 +223,11 @@ String buildConfigBackup()
 	return out;
 }
 
-void applyConfigBackup(const String &text)
+void applyConfigBackup(const String &text, uint16_t *appliedOut, uint16_t *unknownOut, uint16_t *invalidOut)
 {
 	int pos = 0;
 	int len = text.length();
-	int applied = 0, unknown = 0;
+	int applied = 0, unknown = 0, invalid = 0;
 	while (pos < len)
 	{
 		int nl = text.indexOf('\n', pos);
@@ -251,6 +251,16 @@ void applyConfigBackup(const String &text)
 				continue;
 			found = true;
 			const ConfigField &f = configFields[i];
+			bool isNumeric = (f.type == CFT_I8 || f.type == CFT_U8 || f.type == CFT_U16 ||
+							   f.type == CFT_U32 || f.type == CFT_INT || f.type == CFT_FLOAT);
+			if (isNumeric && !isValidNumber(value))
+			{
+				// Not a crash, not a silent 0 - leave config's current value for
+				// this field untouched. A bad value in one field of an uploaded
+				// backup shouldn't blank out a previously-good, unrelated field.
+				invalid++;
+				break;
+			}
 			switch (f.type)
 			{
 			case CFT_BOOL:
@@ -285,5 +295,11 @@ void applyConfigBackup(const String &text)
 		if (!found)
 			unknown++;
 	}
-	projLog(LOGCAT_SYSTEM, "Config restore: %d fields applied, %d unknown keys skipped", applied, unknown);
+	projLog(LOGCAT_SYSTEM, "Config restore: %d applied, %d unknown, %d invalid (kept previous value)", applied, unknown, invalid);
+	if (appliedOut)
+		*appliedOut = (uint16_t)applied;
+	if (unknownOut)
+		*unknownOut = (uint16_t)unknown;
+	if (invalidOut)
+		*invalidOut = (uint16_t)invalid;
 }

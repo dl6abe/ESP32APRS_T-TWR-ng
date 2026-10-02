@@ -643,7 +643,7 @@ void MySymbolBox::Show()
 // enough for the compiler to see the MenuComponentRenderer base class).
 MyRenderer my_renderer;
 
-// void on_stationbeacon_selected(MenuItem *p_menu_item)
+// void on_stationbeacon_selected(MenuComponent *p_menu_item)
 // {
 //     int i;
 //     MyCheckBox chkBox[3];

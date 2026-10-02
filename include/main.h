@@ -88,8 +88,6 @@ void initVersion();
 
 #define IMPLEMENTATION FIFO
 
-#define FORMAT_SPIFFS_IF_FAILED true
-
 #ifdef BOARD_HAS_PSRAM
 #define TLMLISTSIZE 10
 #define PKGLISTSIZE 100
@@ -142,7 +140,6 @@ void initVersion();
 #include <Arduino.h>
 #include <FS.h>
 #include <SD.h>
-#include <SPIFFS.h>
 #include <AX25.h>
 
 #include "HardwareSerial.h"
@@ -463,8 +460,19 @@ extern RTC_DATA_ATTR txQueueType txQueue[PKGTXSIZE];
 #endif
 
 uint8_t checkSum(uint8_t *ptr, size_t count);
+// Despite the name (kept for its ~40 existing call sites rather than
+// churning every one - see FORK_NOTES.md/Gitea issue #2), this persists
+// `config` as /config.json on LittleFS, not raw EEPROM bytes - see
+// config_json.h/src/config_json.cpp.
 void saveEEPROM();
-void defaultConfig();
+// Populates `config` in RAM with the compiled-in defaults, no I/O -
+// split out of defaultConfig() so a field missing from an
+// already-migrated device's /config.json (e.g. one added in a later
+// firmware build than whatever last wrote that device's file) can be
+// defaulted correctly at boot before the JSON load overlays on top of it,
+// instead of falling back to C++ zero-init. See src/main.cpp's setup().
+void setConfigDefaults();
+void defaultConfig(); // setConfigDefaults() + saveEEPROM(), unchanged external behavior/call sites
 String getValue(String data, char separator, int index);
 boolean isValidNumber(String str);
 void taskGPS(void *pvParameters);

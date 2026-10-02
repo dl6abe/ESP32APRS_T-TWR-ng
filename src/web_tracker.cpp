@@ -164,7 +164,7 @@ void handle_tracker()
 					if (isValidNumber(server.arg(i)))
 						config.trk_ssid = server.arg(i).toInt();
 					if (config.trk_ssid > 15)
-						config.trk_ssid = 13;
+						config.trk_ssid = 7; // matches this page's own compiled default (setConfigDefaults()), not an unrelated value
 				}
 			}
 			if (server.argName(i) == "trackerPosInv")

@@ -21,7 +21,7 @@
 #include "sa868.h"
 
 #define SerialLOG Serial
-void on_wifi_AP_selected(MenuItem *p_menu_item)
+void on_wifi_AP_selected(MenuComponent *p_menu_item)
 {
     MyTextBox txtBox[2];
     MyCheckBox chkBoxWiFi;
@@ -192,7 +192,7 @@ void on_wifi_AP_selected(MenuItem *p_menu_item)
     // }
 }
 
-void on_wifi_Client_selected(MenuItem *p_menu_item)
+void on_wifi_Client_selected(MenuComponent *p_menu_item)
 {
     MyTextBox txtBox[2];
     MyCheckBox chkBoxWiFi;
@@ -363,7 +363,7 @@ void on_wifi_Client_selected(MenuItem *p_menu_item)
     // }
 }
 
-void on_bluetooth_selected(MenuItem *p_menu_item)
+void on_bluetooth_selected(MenuComponent *p_menu_item)
 {
     MyTextBox txtBox[2];
     MyCheckBox chkBoxWiFi;
@@ -511,7 +511,7 @@ void on_bluetooth_selected(MenuItem *p_menu_item)
 
 
 
-void on_rfconfig_selected(MenuItem *p_menu_item)
+void on_rfconfig_selected(MenuComponent *p_menu_item)
 {
     MyTextBox txtBox[2];
     MyCheckBox chkBoxRF;

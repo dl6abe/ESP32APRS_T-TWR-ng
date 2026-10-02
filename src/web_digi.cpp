@@ -143,7 +143,12 @@ void handle_digi()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.digi_phg, server.arg(i).c_str());
+					// No client-side maxlength existed on this field at all
+					// (unlike most other text inputs on this page) - a raw
+					// POST with an oversized value overflowed digi_phg[8]
+					// directly. Clamp per CLAUDE.md's buffer-safety rule.
+					strncpy(config.digi_phg, server.arg(i).c_str(), sizeof(config.digi_phg) - 1);
+					config.digi_phg[sizeof(config.digi_phg) - 1] = 0;
 				}
 			}
 			if (server.argName(i) == "digiComment")
@@ -328,6 +333,10 @@ void handle_digi()
 		html += "document.getElementById('digiImgSymbol').src = \"/icon.png?c=\"+symbol.toString()+\"&t=\"+table.toString();\n";
 		html += "\n}\n";
 		html += "function calculatePHGR(){document.forms.formDIGI.texttouse.value=\"PHG\"+calcPower(document.forms.formDIGI.power.value)+calcHeight(document.forms.formDIGI.haat.value)+calcGain(document.forms.formDIGI.gain.value)+calcDirection(document.forms.formDIGI.direction.selectedIndex)}function Log2(e){return Math.log(e)/Math.log(2)}function calcPerHour(e){return e<10?e:String.fromCharCode(65+(e-10))}function calcHeight(e){return String.fromCharCode(48+Math.round(Log2(e/10),0))}function calcPower(e){if(e<1)return 0;if(e>=1&&e<4)return 1;if(e>=4&&e<9)return 2;if(e>=9&&e<16)return 3;if(e>=16&&e<25)return 4;if(e>=25&&e<36)return 5;if(e>=36&&e<49)return 6;if(e>=49&&e<64)return 7;if(e>=64&&e<81)return 8;if(e>=81)return 9}function calcDirection(e){if(e==\"0\")return\"0\";if(e==\"1\")return\"1\";if(e==\"2\")return\"2\";if(e==\"3\")return\"3\";if(e==\"4\")return\"4\";if(e==\"5\")return\"5\";if(e==\"6\")return\"6\";if(e==\"7\")return\"7\";if(e==\"8\")return\"8\"}function calcGain(e){return e>9?\"9\":e<0?\"0\":Math.round(e,0)}\n";
+		html += "function onDigiPosSelChange() {\n";
+		html += "var isGPS = document.querySelector('input[name=\"digiPosSel\"][value=\"1\"]').checked;\n";
+		html += "document.getElementById(\"digiFixPosGrp\").style.display = isGPS ? \"none\" : \"\";\n";
+		html += "}\n";
 		html += "</script>\n";
 
 		/************************ DIGI Mode **************************/
@@ -412,11 +421,15 @@ void handle_digi()
 			digiPos2RFFlag = "checked";
 		if (config.digi_loc2inet)
 			digiPos2INETFlag = "checked";
-		html += "<div class=\"dash-field\"><label>Location Source</label><div class=\"dash-field-body\"><label><input type=\"radio\" name=\"digiPosSel\" value=\"0\" " + digiPosFixFlag + "/> Fix</label><label><input type=\"radio\" name=\"digiPosSel\" value=\"1\" " + digiPosGPSFlag + "/> GPS</label></div></div>\n";
+		html += "<div class=\"dash-field\"><label>Location Source</label><div class=\"dash-field-body\"><label><input type=\"radio\" name=\"digiPosSel\" value=\"0\" onchange=\"onDigiPosSelChange()\" " + digiPosFixFlag + "/> Fix</label><label><input type=\"radio\" name=\"digiPosSel\" value=\"1\" onchange=\"onDigiPosSelChange()\" " + digiPosGPSFlag + "/> GPS</label></div></div>\n";
 		html += "<div class=\"dash-field\"><label>TX Channel</label><div class=\"dash-field-body\"><label><input type=\"checkbox\" name=\"digiPos2RF\" value=\"OK\" " + digiPos2RFFlag + "/> RF</label><label><input type=\"checkbox\" name=\"digiPos2INET\" value=\"OK\" " + digiPos2INETFlag + "/> Internet</label></div></div>\n";
+		// Lat/Lon/Alt only make sense for a Fix position - hidden while GPS is
+		// selected, same pattern as web_igate.cpp/web_tracker.cpp.
+		html += "<div id=\"digiFixPosGrp\"" + String(config.digi_gps ? " style=\"display:none\"" : "") + ">\n";
 		html += "<div class=\"dash-field\"><label for=\"digiPosLat\">Latitude</label><div class=\"dash-field-body\"><input min=\"-90\" max=\"90\" step=\"0.00001\" id=\"digiPosLat\" name=\"digiPosLat\" type=\"number\" value=\"" + String(config.digi_lat, 5) + "\" /><span class=\"dash-hint\">degrees (positive for North, negative for South)</span></div></div>\n";
 		html += "<div class=\"dash-field\"><label for=\"digiPosLon\">Longitude</label><div class=\"dash-field-body\"><input min=\"-180\" max=\"180\" step=\"0.00001\" id=\"digiPosLon\" name=\"digiPosLon\" type=\"number\" value=\"" + String(config.digi_lon, 5) + "\" /><span class=\"dash-hint\">degrees (positive for East, negative for West)</span></div></div>\n";
 		html += "<div class=\"dash-field\"><label for=\"digiPosAlt\">Altitude</label><div class=\"dash-field-body\"><input min=\"0\" max=\"10000\" step=\"0.1\" id=\"digiPosAlt\" name=\"digiPosAlt\" type=\"number\" value=\"" + String(config.digi_alt, 2) + "\" /><span class=\"dash-hint\">meters - value 0 is not sent</span></div></div>\n";
+		html += "</div>\n"; // #digiFixPosGrp
 		html += "</div>\n"; // .dash-panel
 
 		html += "<div class=\"dash-section-title\">PHG (Power-Height-Gain)</div>\n";
@@ -456,7 +469,7 @@ void handle_digi()
 		html += "<option>Omni</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option><option>N</option>\n";
 		html += "</select></div></div>\n";
 
-		html += "<div class=\"dash-field\"><label for=\"texttouse\">PHG Text</label><div class=\"dash-field-body\"><input name=\"texttouse\" type=\"text\" size=\"6\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.digi_phg) + "\"/> <button type=\"button\" onclick=\"javascript:calculatePHGR()\">Calculate PHG</button></div></div>\n";
+		html += "<div class=\"dash-field\"><label for=\"texttouse\">PHG Text</label><div class=\"dash-field-body\"><input name=\"texttouse\" type=\"text\" size=\"6\" maxlength=\"" + String(sizeof(config.digi_phg) - 1) + "\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.digi_phg) + "\"/> <button type=\"button\" onclick=\"javascript:calculatePHGR()\">Calculate PHG</button></div></div>\n";
 		html += "</div>\n"; // .dash-panel
 
 		html += "<div class=\"dash-section-title\">Filter</div>\n";

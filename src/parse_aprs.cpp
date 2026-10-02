@@ -1705,34 +1705,53 @@ int ParseAPRS::parse_aprs(struct pbuf_t *pb)
 		{
 			pb->packettype |= T_POSITION;
 			rc = parse_aprs_mice(pb, (const unsigned char *)body, (const unsigned char *)body_end);
-			int len = (int)(body_end - body - 9);
+			// Mic-E info field layout: body[0..7] are the 8 position/speed/
+			// course/symbol bytes (validated by the column checks in
+			// parse_aprs_mice() above) - the optional status/comment text
+			// starts right after them, at body[8]. Confirmed against the
+			// reference implementation this parser was ported from
+			// (Ham::APRS::FAP's _mice_to_decimal(): "if (length($packet) > 8)
+			// { my $rest = substr($packet, 8); ..."). This used to read
+			// "body + 9", one byte too far, silently dropping the first byte
+			// of the status/comment field on every Mic-E packet. Found live
+			// 2026-09-30 (user report, e.g. SP7TBS-9 "6]}", DF4OR "_1").
+			int len = (int)(body_end - body - 8);
 			if (len > 0)
 			{
-				const char *rest = body + 9;
+				const char *rest = body + 8;
 				unsigned int rest_len = (unsigned int)len;
-				// Mic-E altitude extension (spec ch.10): 3 base91 digits + '}'
-				// immediately at the front of the status text - a different
-				// encoding from the ASCII "/A=nnnnnn" extension
-				// parse_aprs_comment() already handles for other packet
-				// types. Decoded here (Mic-E-specific), not inside
-				// parse_aprs_comment() itself, which every packet type
-				// shares - a generic "3 chars + }" check there would
-				// false-positive on ordinary comment text. Found live
-				// 2026-09-29 (user report): the raw, undecoded "xyz}" bytes
-				// leaked into the comment ahead of the real status text
-				// (e.g. a frequency spec + free text), altitude was lost.
-				if (rest_len >= 4 && rest[3] == '}' &&
-					(unsigned char)rest[0] >= 0x21 && (unsigned char)rest[0] <= 0x7b &&
-					(unsigned char)rest[1] >= 0x21 && (unsigned char)rest[1] <= 0x7b &&
-					(unsigned char)rest[2] >= 0x21 && (unsigned char)rest[2] <= 0x7b)
+				// Mic-E altitude extension (spec ch.10): 3 base91 digits + '}',
+				// found anywhere in the status text (not necessarily at the
+				// very front - real radios routinely prefix it with free-text
+				// status, e.g. a frequency spec) - a different encoding from
+				// the ASCII "/A=nnnnnn" extension parse_aprs_comment() already
+				// handles for other packet types. Decoded here (Mic-E
+				// specific), not inside parse_aprs_comment() itself, which
+				// every packet type shares - a generic "3 chars + }" check
+				// there would false-positive on ordinary comment text.
+				// Matches FAP's non-greedy `/^(.*?)([\x21-\x7b]{3})\}(.*)$/`:
+				// take the first (leftmost) match, keep whatever text comes
+				// before and after it. The earlier front-only check (found
+				// live 2026-09-29) missed this case entirely - combined with
+				// the body+9 offset bug above, the undecoded "xyz}" bytes
+				// leaked straight into the LastHeard comment instead of being
+				// decoded as altitude and stripped.
+				for (unsigned int i = 0; i + 4 <= rest_len; i++)
 				{
-					long alt_raw = (((long)(rest[0] - 33) * 91L) + (rest[1] - 33)) * 91L + (rest[2] - 33);
-					pb->altitude = (double)(alt_raw - 10000); // meters, per spec
-					pb->flags |= F_ALT;
-					unsigned int tmp_us;
-					char *tmp_str = parse_remove_part(rest, rest_len, 0, 4, &tmp_us);
-					rest = tmp_str;
-					rest_len = tmp_us;
+					if (rest[i + 3] == '}' &&
+						(unsigned char)rest[i] >= 0x21 && (unsigned char)rest[i] <= 0x7b &&
+						(unsigned char)rest[i + 1] >= 0x21 && (unsigned char)rest[i + 1] <= 0x7b &&
+						(unsigned char)rest[i + 2] >= 0x21 && (unsigned char)rest[i + 2] <= 0x7b)
+					{
+						long alt_raw = (((long)(rest[i] - 33) * 91L) + (rest[i + 1] - 33)) * 91L + (rest[i + 2] - 33);
+						pb->altitude = (double)(alt_raw - 10000); // meters, per spec
+						pb->flags |= F_ALT;
+						unsigned int tmp_us;
+						char *tmp_str = parse_remove_part(rest, rest_len, i, i + 4, &tmp_us);
+						rest = tmp_str;
+						rest_len = tmp_us;
+						break;
+					}
 				}
 				if (rest_len > 0)
 					parse_aprs_comment(pb, rest, rest_len);

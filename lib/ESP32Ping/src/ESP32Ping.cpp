@@ -44,13 +44,15 @@ bool PingClass::ping(IPAddress dest, byte count) {
     _options.recv_function = reinterpret_cast<ping_recv_function>(&PingClass::_ping_recv_cb);
     _options.sent_function = NULL; //reinterpret_cast<ping_sent_function>(&_ping_sent_cb);
 
-    // Let's go!
-    if (ping_start(&_options)) {
-        // Suspend till the process end
-        esp_yield();
-    }
 
-    return (_success > 0);
+    // Suspend till the process end
+    esp_yield(); // ????????? Where should this be placed?
+
+    // Let's go!
+    ping_start(&_options); // Here we do all the work
+
+    // Returns true if at least 1 ping had a pong response
+    return (_success > 0); //_success variable is changed by the callback function
 }
 
 bool PingClass::ping(const char *host, byte count) {
@@ -62,7 +64,7 @@ bool PingClass::ping(const char *host, byte count) {
     return false;
 }
 
-int PingClass::averageTime() {
+float PingClass::averageTime() {
     return _avg_time;
 }
 
@@ -72,23 +74,21 @@ void PingClass::_ping_recv_cb(void *opt, void *resp) {
     //ping_option* ping_opt  = reinterpret_cast<struct ping_option*>(opt);
 
     // Error or success?
-    if (ping_resp->ping_err == -1)
-        _errors++;
-    else {
-        _success++;
-        _avg_time += ping_resp->resp_time;
-    }
+    _errors = ping_resp->timeout_count;
+    _success = ping_resp->total_count - ping_resp->timeout_count;
+    _avg_time = ping_resp->resp_time;
+
 
     // Some debug info
     DEBUG_PING(
             "DEBUG: ping reply\n"
                     "\ttotal_count = %d \n"
-                    "\tresp_time = %d \n"
+                    "\tresp_time = %f ms\n"
                     "\tseqno = %d \n"
                     "\ttimeout_count = %d \n"
                     "\tbytes = %d \n"
                     "\ttotal_bytes = %d \n"
-                    "\ttotal_time = %d \n"
+                    "\ttotal_time = %f s\n"
                     "\tping_err = %d \n",
             ping_resp->total_count, ping_resp->resp_time, ping_resp->seqno,
             ping_resp->timeout_count, ping_resp->bytes, ping_resp->total_bytes,
@@ -96,20 +96,20 @@ void PingClass::_ping_recv_cb(void *opt, void *resp) {
     );
 
     // Is it time to end?
-    // Don't using seqno because it does not increase on error
-    if (_success + _errors == _expected_count) {
-        _avg_time = _avg_time / _expected_count;
+    DEBUG_PING("Avg resp time %f ms\n", _avg_time);
 
-        DEBUG_PING("Avg resp time %d ms\n", _avg_time);
+    // Done, return to main function
+    esp_schedule();
 
-        // Done, return to main functiom
-        esp_schedule();
+    // just a check ...
+    if (_success + _errors != _expected_count) {
+        DEBUG_PING("Something went wrong: _success=%d and _errors=%d do not sum up to _expected_count=%d\n",_success, _errors, _expected_count );
     }
 }
 
 byte PingClass::_expected_count = 0;
 byte PingClass::_errors = 0;
 byte PingClass::_success = 0;
-int  PingClass::_avg_time = 0;
+float PingClass::_avg_time = 0;
 
 PingClass Ping;

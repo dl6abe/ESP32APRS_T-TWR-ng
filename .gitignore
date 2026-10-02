@@ -8,6 +8,9 @@ tools/aprs_test/aprs_test
 tools/wifi_validate_test/wifi_validate_test
 tools/config_test/config_test
 tools/config_test/config_test.dSYM
+tools/config_test/config_json_test
+tools/config_test/config_json_test.dSYM
+tools/queue_test/queue_test
 tools/web_preview/node_modules
 tools/web_preview/package-lock.json
 tools/web_preview/assembled

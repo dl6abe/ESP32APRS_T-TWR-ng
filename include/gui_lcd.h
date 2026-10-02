@@ -249,42 +249,42 @@ void pushTxDisp(uint8_t ch, const char *name, char *info);
 
 // Menu handlers - one per source file, see ARCHITECTURE.md.
 // gui_menu_wifi.cpp
-void on_wifi_AP_selected(MenuItem *p_menu_item);
-void on_wifi_Client_selected(MenuItem *p_menu_item);
-void on_bluetooth_selected(MenuItem *p_menu_item);
-void on_rfconfig_selected(MenuItem *p_menu_item);
+void on_wifi_AP_selected(MenuComponent *p_menu_item);
+void on_wifi_Client_selected(MenuComponent *p_menu_item);
+void on_bluetooth_selected(MenuComponent *p_menu_item);
+void on_rfconfig_selected(MenuComponent *p_menu_item);
 // gui_menu_igate.cpp
-void on_aprsserver_selected(MenuItem *p_menu_item);
-void on_igate_position_selected(MenuItem *p_menu_item);
-void on_igate_function_selected(MenuItem *p_menu_item);
-void on_igate_beacon_selected(MenuItem *p_menu_item);
+void on_aprsserver_selected(MenuComponent *p_menu_item);
+void on_igate_position_selected(MenuComponent *p_menu_item);
+void on_igate_function_selected(MenuComponent *p_menu_item);
+void on_igate_beacon_selected(MenuComponent *p_menu_item);
 // gui_menu_tracker.cpp
-void on_smartbeacon_selected(MenuItem *p_menu_item);
-void on_tracker_position_selected(MenuItem *p_menu_item);
-void on_tracker_function_selected(MenuItem *p_menu_item);
-void on_tracker_option_selected(MenuItem *p_menu_item);
+void on_smartbeacon_selected(MenuComponent *p_menu_item);
+void on_tracker_position_selected(MenuComponent *p_menu_item);
+void on_tracker_function_selected(MenuComponent *p_menu_item);
+void on_tracker_option_selected(MenuComponent *p_menu_item);
 // gui_menu_digi.cpp
-void on_digi_position_selected(MenuItem *p_menu_item);
-void on_digi_function_selected(MenuItem *p_menu_item);
-void on_digi_option_selected(MenuItem *p_menu_item);
-void on_filter_digi_selected(MenuItem *p_menu_item);
+void on_digi_position_selected(MenuComponent *p_menu_item);
+void on_digi_function_selected(MenuComponent *p_menu_item);
+void on_digi_option_selected(MenuComponent *p_menu_item);
+void on_filter_digi_selected(MenuComponent *p_menu_item);
 // gui_menu_filter.cpp
-void on_filter_selected(MenuItem *p_menu_item);
-void on_filter_display_selected(MenuItem *p_menu_item);
-void on_filter_inet2rf_selected(MenuItem *p_menu_item);
-void on_filter_rf2inet_selected(MenuItem *p_menu_item);
+void on_filter_selected(MenuComponent *p_menu_item);
+void on_filter_display_selected(MenuComponent *p_menu_item);
+void on_filter_inet2rf_selected(MenuComponent *p_menu_item);
+void on_filter_rf2inet_selected(MenuComponent *p_menu_item);
 // gui_menu_system.cpp
-void on_display_selected(MenuItem *p_menu_item);
-void on_information_selected(MenuItem *p_menu_item);
-void on_save_selected(MenuItem *p_menu_item);
-void on_load_selected(MenuItem *p_menu_item);
-void on_factory_selected(MenuItem *p_menu_item);
-void on_reboot_selected(MenuItem *p_menu_item);
-void on_dashboard_selected(MenuItem *p_menu_item);
-void on_wifistatus_selected(MenuItem *p_menu_item);
-void on_txbeacon_selected(MenuItem *p_menu_item);
-void on_txstatus_selected(MenuItem *p_menu_item);
-void on_back_selected(MenuItem *p_menu_item);
+void on_display_selected(MenuComponent *p_menu_item);
+void on_information_selected(MenuComponent *p_menu_item);
+void on_save_selected(MenuComponent *p_menu_item);
+void on_load_selected(MenuComponent *p_menu_item);
+void on_factory_selected(MenuComponent *p_menu_item);
+void on_reboot_selected(MenuComponent *p_menu_item);
+void on_dashboard_selected(MenuComponent *p_menu_item);
+void on_wifistatus_selected(MenuComponent *p_menu_item);
+void on_txbeacon_selected(MenuComponent *p_menu_item);
+void on_txstatus_selected(MenuComponent *p_menu_item);
+void on_back_selected(MenuComponent *p_menu_item);
 
 
 // const char *str_status[] = {

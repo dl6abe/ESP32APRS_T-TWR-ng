@@ -153,6 +153,26 @@ int main()
 		}
 	}
 
+	// --- Test 5: a non-numeric value for a numeric field is skipped, not
+	// silently coerced to 0 - and the three out-params report it accurately ---
+	memset(&config, 0, sizeof(Configuration));
+	config.aprs_port = 14580; // pre-existing "current value", should survive
+	{
+		uint16_t applied = 0, unknown = 0, invalid = 0;
+		applyConfigBackup(String("aprs_port=notanumber\naprs_mycall=DL6ABE\n"), &applied, &unknown, &invalid);
+		if (config.aprs_port != 14580)
+		{
+			printf("FAIL aprs_port clobbered by invalid value: got=%u want=14580\n", config.aprs_port);
+			failures++;
+		}
+		expectEq("aprs_mycall (alongside invalid field)", String(config.aprs_mycall), String("DL6ABE"));
+		if (applied != 1 || unknown != 0 || invalid != 1)
+		{
+			printf("FAIL invalid-value counters: applied=%u unknown=%u invalid=%u want=1/0/1\n", applied, unknown, invalid);
+			failures++;
+		}
+	}
+
 	if (failures == 0)
 	{
 		printf("OK: all config backup/restore tests passed (%zu fields)\n", configFieldCount);

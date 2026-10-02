@@ -72,7 +72,7 @@ void handle_igate()
 					if (isValidNumber(server.arg(i)))
 						config.aprs_ssid = server.arg(i).toInt();
 					if (config.aprs_ssid > 15)
-						config.aprs_ssid = 13;
+						config.aprs_ssid = 1; // matches this page's own compiled default (setConfigDefaults()), not an unrelated value
 				}
 			}
 			if (server.argName(i) == "igatePosInv")
@@ -172,7 +172,12 @@ void handle_igate()
 			{
 				if (server.arg(i) != "")
 				{
-					strcpy(config.igate_phg, server.arg(i).c_str());
+					// No client-side maxlength existed on this field at all
+					// (unlike most other text inputs on this page) - a raw
+					// POST with an oversized value overflowed igate_phg[8]
+					// directly. Clamp per CLAUDE.md's buffer-safety rule.
+					strncpy(config.igate_phg, server.arg(i).c_str(), sizeof(config.igate_phg) - 1);
+					config.igate_phg[sizeof(config.igate_phg) - 1] = 0;
 				}
 			}
 			if (server.argName(i) == "aprsComment")
@@ -639,7 +644,7 @@ void handle_igate()
 		html += "<option>Omni</option><option>NE</option><option>E</option><option>SE</option><option>S</option><option>SW</option><option>W</option><option>NW</option><option>N</option>\n";
 		html += "</select></div></div>\n";
 
-		html += "<div class=\"dash-field\"><label for=\"texttouse\">PHG Text</label><div class=\"dash-field-body\"><input name=\"texttouse\" type=\"text\" size=\"9\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.igate_phg) + "\"/> <button type=\"button\" onclick=\"javascript:calculatePHGR()\">Calculate PHG</button></div></div>\n";
+		html += "<div class=\"dash-field\"><label for=\"texttouse\">PHG Text</label><div class=\"dash-field-body\"><input name=\"texttouse\" type=\"text\" size=\"9\" maxlength=\"" + String(sizeof(config.igate_phg) - 1) + "\" style=\"background-color: rgb(97, 239, 170);\" value=\"" + String(config.igate_phg) + "\"/> <button type=\"button\" onclick=\"javascript:calculatePHGR()\">Calculate PHG</button></div></div>\n";
 		html += "</div>\n"; // .dash-panel
 
 		html += "<div class=\"dash-form-actions\"><button type='submit' id='submitIGATE' name=\"commitIGATE\">Apply Change</button></div>\n";

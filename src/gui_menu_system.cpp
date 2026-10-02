@@ -14,6 +14,7 @@
 #include "qrcode.h"
 #include "wifi_config.h"
 #include "webservice.h"
+#include "config_json.h"
 
 #include <HTTPClient.h>
 #include <ESP32httpUpdate.h>
@@ -21,7 +22,7 @@
 #include "sa868.h"
 
 #define SerialLOG Serial
-void on_display_selected(MenuItem *p_menu_item)
+void on_display_selected(MenuComponent *p_menu_item)
 {
     // MyTextBox txtBox;
     MyCheckBox chkBoxWiFi;
@@ -204,7 +205,7 @@ void on_display_selected(MenuItem *p_menu_item)
         delay(10);
 }
 
-void on_information_selected(MenuItem *p_menu_item)
+void on_information_selected(MenuComponent *p_menu_item)
 {
     String str;
     int x;
@@ -223,7 +224,7 @@ void on_information_selected(MenuItem *p_menu_item)
     display.setTextColor(WHITE);
 
     display.setCursor(0, 18);
-    display.print("Firmware: V");
+    display.print("Firmware: v");
     display.printf("%s%c\n", VERSION, VERSION_BUILD);
     display.printf("Build: %s %s\n", __DATE__, __TIME__);
     display.printf("ESP32 Model: %s\n", ESP.getChipModel());
@@ -249,43 +250,42 @@ void on_information_selected(MenuItem *p_menu_item)
     }
 }
 
-void on_save_selected(MenuItem *p_menu_item)
+void on_save_selected(MenuComponent *p_menu_item)
 {
-    saveEEPROM();
+    saveEEPROM(); // despite the name, writes /config.json on LittleFS - see include/main.h
 
     display.clearDisplay();
     display.setCursor(52, 4);
     display.print("SAVE");
     display.setCursor(0, 18);
-    display.print("Save All Configure\n to EEPROM");
+    display.print("Save All Configure\n to Flash");
     display.display();
     delay(1000);
     while (digitalRead(keyPush) == LOW)
         delay(10);
 }
 
-void on_load_selected(MenuItem *p_menu_item)
+void on_load_selected(MenuComponent *p_menu_item)
 {
-    uint8_t *ptr;
-
-    ptr = (byte *)&config;
-    EEPROM.readBytes(1, ptr, sizeof(Configuration));
-    uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
-    projLog(LOGCAT_SYSTEM, "EEPROM Check %0Xh=%0Xh(%dByte)", EEPROM.read(0), chkSum, sizeof(Configuration));
+    // Was a raw EEPROM.readBytes() bypassing config_fields.h/JSON entirely,
+    // with an inverted OK/Fail message (printed "OK!" inside the
+    // checksum-*mismatch* branch) - replaced with the real load path, fixed
+    // in the same change since the rewrite touches these exact lines
+    // regardless. See FORK_NOTES.md/Gitea issue #2.
+    bool ok = loadConfigJson();
 
     display.clearDisplay();
     display.setCursor(52, 4);
     display.print("LOAD");
     display.setCursor(0, 18);
-    if (EEPROM.read(0) != chkSum)
+    if (ok)
     {
         display.print("Load Configuration OK!");
-        projLog(LOGCAT_SYSTEM, "Config EEPROM Error!");
-        // defaultConfig();
     }
     else
     {
         display.print("Load Configuration Fail!");
+        projLog(LOGCAT_SYSTEM, "on_load_selected(): no/corrupt config.json");
     }
     display.display();
     delay(1000);
@@ -293,7 +293,7 @@ void on_load_selected(MenuItem *p_menu_item)
         delay(10);
 }
 
-void on_factory_selected(MenuItem *p_menu_item)
+void on_factory_selected(MenuComponent *p_menu_item)
 {
     defaultConfig();
     display.clearDisplay();
@@ -311,7 +311,7 @@ void on_factory_selected(MenuItem *p_menu_item)
         delay(10);
 }
 
-void on_reboot_selected(MenuItem *p_menu_item)
+void on_reboot_selected(MenuComponent *p_menu_item)
 {
     display.clearDisplay();
     display.setCursor(52, 4);
@@ -326,7 +326,7 @@ void on_reboot_selected(MenuItem *p_menu_item)
     ESP.restart();
 }
 
-void on_dashboard_selected(MenuItem *p_menu_item)
+void on_dashboard_selected(MenuComponent *p_menu_item)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
@@ -342,7 +342,7 @@ void on_dashboard_selected(MenuItem *p_menu_item)
     display.display();
 }
 
-void on_wifistatus_selected(MenuItem *p_menu_item)
+void on_wifistatus_selected(MenuComponent *p_menu_item)
 {
     String str;
     // char ch[10];
@@ -386,7 +386,7 @@ void on_wifistatus_selected(MenuItem *p_menu_item)
     }
 }
 
-void on_txbeacon_selected(MenuItem *p_menu_item)
+void on_txbeacon_selected(MenuComponent *p_menu_item)
 {
     String str;
     int x;
@@ -411,12 +411,12 @@ void on_txbeacon_selected(MenuItem *p_menu_item)
     // tncTxEnable = true;
 }
 
-void on_txstatus_selected(MenuItem *p_menu_item)
+void on_txstatus_selected(MenuComponent *p_menu_item)
 {
     String str;
     char cstr[300];
     int x;
-    sprintf(cstr, ">WiFi IGate V%s%c\r\n", VERSION, VERSION_BUILD);
+    sprintf(cstr, ">WiFi IGate v%s%c\r\n", VERSION, VERSION_BUILD);
     // SerialTNC.flush();
     // tncTxEnable = false;
     display.clearDisplay();
@@ -444,7 +444,7 @@ byte htod(char *val, int str, int stp)
     return ret;
 }
 
-void on_back_selected(MenuItem *p_menu_item)
+void on_back_selected(MenuComponent *p_menu_item)
 {
     line = 15;
     ms.back();

@@ -40,6 +40,7 @@
 #include "AFSK.h"
 
 #include "gui_lcd.h"
+#include "config_json.h"
 
 #define DEBUG_TNC
 
@@ -52,22 +53,18 @@
 #include "sa868.h"
 
 
+// Despite the name, writes /config.json on LittleFS (see include/main.h's
+// declaration comment and config_json.h) - kept so the ~40 existing call
+// sites across this codebase don't all need touching for this rename.
 void saveEEPROM()
 {
-  uint8_t chkSum = 0;
-  byte *ptr;
-  ptr = (byte *)&config;
-  EEPROM.writeBytes(1, ptr, sizeof(Configuration));
-  chkSum = checkSum(ptr, sizeof(Configuration));
-  EEPROM.write(0, chkSum);
-  EEPROM.commit();
-#ifdef DEBUG
-  projLog(LOGCAT_SYSTEM, "Save EEPROM ChkSUM=");
-  projLog(LOGCAT_SYSTEM, "%0X", chkSum);
-#endif
+  if (!saveConfigJsonImpl())
+  {
+    projLog(LOGCAT_SYSTEM, "saveEEPROM(): failed to persist %s", CONFIG_JSON_PATH);
+  }
 }
 
-void defaultConfig()
+void setConfigDefaults()
 {
   projLog(LOGCAT_SYSTEM, "Default configure mode!");
   config.synctime = true;
@@ -112,7 +109,7 @@ void defaultConfig()
   config.band = 0;
   config.sql_level = 1;
   config.rf_power = LOW;
-  config.volume = 6;
+  config.volume = 1;
   config.mic = 8;
 
   // IGATE
@@ -133,7 +130,7 @@ void defaultConfig()
   snprintf(config.aprs_moniCall, sizeof(config.aprs_moniCall), "%s-%d", config.aprs_mycall, config.aprs_ssid);
   sprintf(config.aprs_filter, "m/10");
   //--Position
-  config.igate_gps = false;
+  config.igate_gps = true; // Location Source default: GPS, not Fix (2026-10-01)
   config.igate_lat = 13.7555;
   config.igate_lon = 100.4930;
   config.igate_alt = 0;
@@ -154,7 +151,7 @@ void defaultConfig()
   sprintf(config.digi_mycall, "NOCALL");
   config.digi_path = PATH_DEFAULT_FIXED; // WIDE1-1
   //--Position
-  config.digi_gps = false;
+  config.digi_gps = true; // Location Source default: GPS, not Fix (2026-10-01)
   config.digi_lat = 13.7555;
   config.digi_lon = 100.4930;
   config.digi_alt = 0;
@@ -178,7 +175,7 @@ void defaultConfig()
   config.trk_path = PATH_DEFAULT_MOBILE; // WIDE1-1,WIDE2-1
 
   //--Position
-  config.trk_gps = false;
+  config.trk_gps = true; // Location Source default: GPS, not Fix (2026-10-01)
   config.trk_lat = 13.7555;
   config.trk_lon = 100.4930;
   config.trk_alt = 0;
@@ -206,8 +203,14 @@ void defaultConfig()
 
   // OLED DISPLAY
   config.oled_enable = true;
-  config.oled_timeout = 60;
-  config.dim = 0;
+  // 0 = never sleep (see gui_lcd.cpp's oled_timeout check). Was 60s -
+  // on unattended hardware (repeaters/igates on towers, no one around to
+  // touch the encoder and wake it back up via oledWake()) that meant the
+  // display went dark a minute after every boot and stayed that way
+  // forever, confusing enough on first encounter to report as "always
+  // black" (2026-10-01).
+  config.oled_timeout = 0;
+  config.dim = 0; // "HI" - full brightness, no dimming (console help: 0=HI 1=LOW 2=AUTO 3=DAY/NIGHT 4=CONTRAST)
   config.contrast = 0;
   config.startup = 0;
 
@@ -248,10 +251,19 @@ void defaultConfig()
   // Console/syslog debug logging - SYSTEM on by default (boot/power/config
   // messages), the rest off until explicitly enabled on the System page.
   config.logCategoryMask = LOGCAT_SYSTEM;
-  config.syslog_en = false;
+  // Enabled by default (2026-10-01) - still inert without a host
+  // (syslogReconnect() requires both syslog_en and a non-empty
+  // syslog_host before it creates a client), so this just saves the
+  // checkbox click once someone does set a host; no behavior change on
+  // its own.
+  config.syslog_en = true;
   config.syslog_host[0] = 0;
   config.syslog_port = 514;
+}
 
+void defaultConfig()
+{
+  setConfigDefaults();
   saveEEPROM();
 }
 

@@ -21,7 +21,7 @@
 #include "sa868.h"
 
 #define SerialLOG Serial
-void on_filter_selected(MenuItem *p_menu_item)
+void on_filter_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 11;
     // MyTextBox txtBox[2];
@@ -177,27 +177,54 @@ void on_filter_selected(MenuItem *p_menu_item)
                     case 1:
                         config.dispINET = chkBox[i].Checked;
                         break;
-                    // case 2:
-                    //     config.filterStatus = chkBox[i].Checked;
-                    //     break;
-                    // case 3:
-                    //     config.filterWeather = chkBox[i].Checked;
-                    //     break;
-                    // case 4:
-                    //     config.filterTelemetry = chkBox[i].Checked;
-                    //     break;
-                    // case 5:
-                    //     config.filterTracker = chkBox[i].Checked;
-                    //     break;
-                    // case 6:
-                    //     config.filterMessage = chkBox[i].Checked;
-                    //     break;
-                    // case 7:
-                    //     config.filterMove = chkBox[i].Checked;
-                    //     break;
-                    // case 8:
-                    //     config.filterPosition = chkBox[i].Checked;
-                    //     break;
+                    // Was dead code (commented-out, referencing fields that
+                    // don't exist - dispFilter is a bitmask, not individual
+                    // bools) - the checkbox visually toggled but nothing
+                    // was ever saved. Fixed to match dispFilter's real
+                    // representation, same pattern as the sibling screen
+                    // on_filter_display_selected() already uses correctly.
+                    case 2:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_STATUS;
+                        else
+                            config.dispFilter &= ~FILTER_STATUS;
+                        break;
+                    case 3:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_WX;
+                        else
+                            config.dispFilter &= ~FILTER_WX;
+                        break;
+                    case 4:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_TELEMETRY;
+                        else
+                            config.dispFilter &= ~FILTER_TELEMETRY;
+                        break;
+                    case 5:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_ITEM;
+                        else
+                            config.dispFilter &= ~FILTER_ITEM;
+                        break;
+                    case 6:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_MESSAGE;
+                        else
+                            config.dispFilter &= ~FILTER_MESSAGE;
+                        break;
+                    case 7:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_POSITION;
+                        else
+                            config.dispFilter &= ~FILTER_POSITION;
+                        break;
+                    case 8:
+                        if (chkBox[i].Checked)
+                            config.dispFilter |= FILTER_BUOY;
+                        else
+                            config.dispFilter &= ~FILTER_BUOY;
+                        break;
                     case 9:
                         config.h_up = chkBox[i].Checked;
                         break;
@@ -244,7 +271,7 @@ void on_filter_selected(MenuItem *p_menu_item)
     saveEEPROM();
 }
 
-void on_filter_display_selected(MenuItem *p_menu_item)
+void on_filter_display_selected(MenuComponent *p_menu_item)
 {
     MyCheckBox chkBox[10];
     MyComboBox cbBox;
@@ -460,7 +487,7 @@ void on_filter_display_selected(MenuItem *p_menu_item)
 }
 
 
-void on_filter_inet2rf_selected(MenuItem *p_menu_item)
+void on_filter_inet2rf_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 10;
     MyCheckBox chkBox[10];
@@ -650,7 +677,7 @@ void on_filter_inet2rf_selected(MenuItem *p_menu_item)
     saveEEPROM();
 }
 
-void on_filter_rf2inet_selected(MenuItem *p_menu_item)
+void on_filter_rf2inet_selected(MenuComponent *p_menu_item)
 {
     int max_sel = 10;
     MyCheckBox chkBox[10];
@@ -839,7 +866,7 @@ void on_filter_rf2inet_selected(MenuItem *p_menu_item)
         ;
     saveEEPROM();
 }
-// void on_tncconfig_selected(MenuItem *p_menu_item)
+// void on_tncconfig_selected(MenuComponent *p_menu_item)
 // {
 //     int max_sel = 6;
 //     MyTextBox txtBox[5];

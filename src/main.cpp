@@ -41,6 +41,8 @@
 #include "AFSK.h"
 
 #include "gui_lcd.h"
+#include "config_json.h"
+#include <LittleFS.h>
 
 #define DEBUG_TNC
 
@@ -520,7 +522,7 @@ void setup()
   aprsClientMutex = xSemaphoreCreateMutex(); // before any task that touches aprsClient starts
   logInit();                                 // before any task that calls projLog() starts
   consoleLogInit();                          // before any task that calls projLog() starts (web_console.cpp)
-  byte *ptr;
+  configJsonInit();                          // before loadConfigJson()/saveConfigJsonImpl() below
 #ifdef BOARD_HAS_PSRAM
   pkgList = (pkgListType *)ps_malloc(sizeof(pkgListType) * PKGLISTSIZE);
   Telemetry = (TelemetryType *)malloc(sizeof(TelemetryType) * TLMLISTSIZE);
@@ -545,7 +547,7 @@ void setup()
   Serial.begin(115200); // debug
 
   // Serial.println();
-  projLog(LOGCAT_SYSTEM, "Start ESP32IGate V%s", String(VERSION).c_str());
+  projLog(LOGCAT_SYSTEM, "Start ESP32IGate v%s", String(VERSION).c_str());
   // log_d("Push BOOT after 3 sec for Factory Default config.");
   projLog(LOGCAT_SYSTEM, "Total heap: %d", ESP.getHeapSize());
 
@@ -576,7 +578,7 @@ void setup()
   display.setTextColor(WHITE);
 
   display.setCursor(60, 40);
-  display.printf("V%s%c", VERSION, VERSION_BUILD); // "FW Ver " no longer fits: VERSION is now 8 chars (YYYYMMDD), was 3 ("0.4")
+  display.printf("v%s%c", VERSION, VERSION_BUILD); // "FW Ver " no longer fits: VERSION is now 8 chars (YYYYMMDD), was 3 ("0.4")
   display.setCursor(60, 55);
   display.print("Copy@2023");
   display.display();
@@ -586,11 +588,40 @@ void setup()
     projLog(LOGCAT_SYSTEM, "failed to initialise EEPROM"); // delay(100000);
   }
 
+  // Primary config storage is now /config.json on LittleFS, not the raw
+  // EEPROM struct below - EEPROM.begin() above is kept only because
+  // migrateFromEepromOrDefault() still needs to read it once, for
+  // already-deployed devices updating onto this firmware for the first
+  // time. See include/config_json.h / FORK_NOTES.md / Gitea issue #2 for
+  // why the old whole-struct-checksum scheme silently wiped WiFi/APRS
+  // settings on any Configuration size change, not just real corruption.
+  if (!LittleFS.begin(false))
+  {
+    // Only format on an actual mount failure, never unconditionally - a
+    // transient mount failure on an already-migrated device must not
+    // silently reformat and wipe /config.json. Even in that worst case
+    // EEPROM is never erased by this scheme, so migrateFromEepromOrDefault()
+    // re-running below still recovers the config as of the original
+    // migration snapshot instead of a hard factory default.
+    projLog(LOGCAT_SYSTEM, "LittleFS mount failed - formatting");
+    LittleFS.begin(true);
+  }
+
   delay(1000);
 
+  // Always populate `config` with the compiled-in defaults before the
+  // factory-reset/load/migrate branches below, so that any field missing
+  // from an already-migrated device's /config.json (e.g. one added in a
+  // later firmware build than whatever last wrote that device's file)
+  // resolves to its real default instead of C++ zero-init once
+  // loadConfigJson() overlays on top of it.
+  setConfigDefaults();
+
+  bool factoryReset = false;
   if (digitalRead(ENCODER_OK_PIN) == LOW)
   {
     defaultConfig();
+    factoryReset = true;
     projLog(LOGCAT_SYSTEM, "Manual Default configure!");
     display.clearDisplay();
     display.setTextSize(1);
@@ -605,23 +636,9 @@ void setup()
     delay(2000);
   }
 
-  // ตรวจสอบคอนฟิกซ์ผิดพลาด
-  ptr = (byte *)&config;
-  EEPROM.readBytes(1, ptr, sizeof(Configuration));
-  uint8_t chkSum = checkSum(ptr, sizeof(Configuration));
-  projLog(LOGCAT_SYSTEM, "EEPROM Check %0Xh=%0Xh(%dByte)", EEPROM.read(0), chkSum, sizeof(Configuration));
-  if (EEPROM.read(0) != chkSum)
+  if (!factoryReset && !loadConfigJson())
   {
-    projLog(LOGCAT_SYSTEM, "Config EEPROM Error!");
-    display.clearDisplay();
-    display.drawYBitmap(50, 0, iconAlert, 28, 28, WHITE);
-    display.setCursor(25, 33);
-    display.print("EEPROM Error!");
-    display.setCursor(23, 45);
-    display.print("Factory Reset");
-    display.display();
-    defaultConfig();
-    delay(2000);
+    migrateFromEepromOrDefault();
   }
 
   syslogReconnect(); // needs config loaded above; actual sending waits for WiFi regardless
@@ -1026,12 +1043,47 @@ void loop()
 void taskGPS(void *pvParameters)
 {
   GPS_INIT();
+  // Raw NMEA echo + byte counter, gated behind System > Debug Logging > GPS
+  // (config.logCategoryMask & LOGCAT_GPS, off by default - see projLog()).
+  // Added to diagnose a "0 satellites" hardware report: previously there was
+  // no way to see whether the module is sending anything at all, since the
+  // only other LOGCAT_GPS line only fires once GPS already has a valid time,
+  // which never happens without a fix - a chicken-and-egg gap for exactly
+  // this failure mode. Kept permanently as a diagnostic tool for future GPS
+  // reception issues, not just this one.
+  char nmeaLine[128];
+  uint8_t nmeaLen = 0;
+  unsigned long gpsRxBytes = 0;
+  unsigned long lastGpsStatsLog = 0;
   for (;;)
   {
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     while (SerialGPS.available())
-      gps.encode(SerialGPS.read());
+    {
+      char c = SerialGPS.read();
+      gps.encode(c);
+      gpsRxBytes++;
+
+      if (c == '\n')
+      {
+        nmeaLine[nmeaLen] = 0;
+        if (nmeaLen > 0)
+          projLog(LOGCAT_GPS, "NMEA: %s", nmeaLine);
+        nmeaLen = 0;
+      }
+      else if (c != '\r' && nmeaLen < sizeof(nmeaLine) - 1)
+      {
+        nmeaLine[nmeaLen++] = c;
+      }
+    }
+
+    if (millis() - lastGpsStatsLog > 5000)
+    {
+      lastGpsStatsLog = millis();
+      projLog(LOGCAT_GPS, "GPS RX bytes total=%lu sat=%d hdop=%.1f locValid=%d locAge=%lums",
+              gpsRxBytes, gps.satellites.value(), gps.hdop.hdop(), gps.location.isValid(), gps.location.age());
+    }
 
     if (gps.time.isValid() && gps.time.isUpdated())
     {
@@ -1292,7 +1344,18 @@ void taskAPRS(void *pvParameters)
         }
       }
 
-      if (EVENT_TX_POSITION > 0)
+      if (EVENT_TX_POSITION > 0 && config.trk_gps && !(gps.location.isValid() && (gps.hdop.hdop() < 10.0)))
+      {
+        // Location Source = GPS but no usable fix - trk_gps_postion() would
+        // build a beacon with an empty/missing position field instead of
+        // just not sending (issue #49). Suppress the send and leave
+        // EVENT_TX_POSITION/tx_counter alone so the trigger re-evaluates
+        // fresh next tick, ready to fire the moment a fix appears rather
+        // than waiting out a whole new interval.
+        projLog(LOGCAT_APRS_RF, "TRACKER: suppressed beacon (EVENT_TX_POSITION=%d) - no GPS fix", EVENT_TX_POSITION);
+        EVENT_TX_POSITION = 0;
+      }
+      else if (EVENT_TX_POSITION > 0)
       {
         String rawData;
         String cmn = "";
@@ -1700,7 +1763,7 @@ void taskNetwork(void *pvParameters)
     // Single grep-able banner line - version + IP together, so both are
     // readable from a serial capture without cross-referencing two log
     // lines from different points in setup()/taskNetwork().
-    projLog(LOGCAT_SYSTEM, "BOOT_INFO: version=V%s%c ip=%s", VERSION, VERSION_BUILD, WiFi.localIP().toString().c_str());
+    projLog(LOGCAT_SYSTEM, "BOOT_INFO: version=v%s%c ip=%s", VERSION, VERSION_BUILD, WiFi.localIP().toString().c_str());
     webService();
     NTP_Timeout = millis() + 2000;
   }

@@ -1,25 +1,23 @@
 /*!\file cppQueue.h
 ** \author SMFSW
-** \copyright BSD 3-Clause License (c) 2017-2020, SMFSW
+** \copyright BSD 3-Clause License (c) 2017-2026, SMFSW
 ** \brief cppQueue handling library (designed on Arduino)
 ** \details cppQueue handling library (designed on Arduino)
 **			This library was designed for Arduino, yet may be compiled without change with gcc for other purposes/targets
 **/
 /****************************************************************/
-#ifndef __CPPQUEUE_H
-	#define __CPPQUEUE_H
+#ifndef CPPQUEUE_H_
+	#define CPPQUEUE_H_
 
-#include <inttypes.h>
+#include <cinttypes>
+#include <cstddef>
 /****************************************************************/
 
 
-#define QUEUE_INITIALIZED	0x5AA5		//!< cppQueue initialized control value
-
-
-/*!\enum enumcppQueueType
+/*!\enum cppQueueType
 ** \brief cppQueue behavior enumeration (FIFO, LIFO)
 **/
-typedef enum enumcppQueueType {
+typedef enum {
 	FIFO = 0,	//!< First In First Out behavior
 	LIFO = 1	//!< Last In First Out behavior
 } cppQueueType;
@@ -33,24 +31,32 @@ class cppQueue
 private:
 	cppQueueType	impl;		//!< cppQueue implementation: FIFO LIFO
 	bool			ovw;		//!< Overwrite previous records when queue is full allowed
+	bool			dynamic;	//!< Set to true when queue is dynamically allocated
+	size_t			queue_sz;	//!< Size of the full queue
+	size_t			rec_sz;		//!< Size of a record
 	uint16_t		rec_nb;		//!< number of records in the queue
-	uint16_t		rec_sz;		//!< Size of a record
-	uint32_t		queue_sz;	//!< Size of the full queue
 	uint8_t *		queue;		//!< cppQueue start pointer (when allocated)
 
 	uint16_t		in;			//!< number of records pushed into the queue
 	uint16_t		out;		//!< number of records pulled from the queue (only for FIFO)
 	uint16_t		cnt;		//!< number of records not retrieved from the queue
 	uint16_t		init;		//!< set to QUEUE_INITIALIZED after successful init of the queue, 0 otherwise
+
+	inline bool _isInitialized(void) const __attribute__((always_inline));
+	inline bool _isEmpty(void) const __attribute__((always_inline));
+	inline bool _isFull(void) const __attribute__((always_inline));
+	inline uint16_t _getCount(void) const __attribute__((always_inline));
 public:
 	/*!	\brief cppQueue constructor
 	**	\param [in] size_rec - size of a record in the queue
 	**	\param [in] nb_recs - number of records in the queue
 	**	\param [in] type - cppQueue implementation type: FIFO, LIFO
 	**	\param [in] overwrite - Overwrite previous records when queue is full
+	**	\param [in] pQDat - Pointer to static data queue
+	**	\param [in] lenQDat - Length of static data queue (in bytes) for static array size check against required size for queue
 	**	\return nothing
 	**/
-	cppQueue(const uint16_t size_rec, const uint16_t nb_recs=20, const cppQueueType type=FIFO, const bool overwrite=false);
+	cppQueue(const size_t size_rec, const uint16_t nb_recs=20, const cppQueueType type=FIFO, const bool overwrite=false, void * const pQDat=NULL, const size_t lenQDat=0);
 
 	/*!	\brief cppQueue destructor: release dynamically allocated queue
 	**/
@@ -71,50 +77,44 @@ public:
 	**	\retval true if queue is allocated
 	**	\retval false is queue is not allocated
 	**/
-	inline bool isInitialized(void) __attribute__((always_inline)) {
-		return (init == QUEUE_INITIALIZED) ? true : false; }
+	bool isInitialized(void) const;
 
 	/*!	\brief get emptiness state of the queue
 	**	\return cppQueue emptiness status
 	**	\retval true if queue is empty
 	**	\retval false is not empty
 	**/
-	inline bool isEmpty(void) __attribute__((always_inline)) {
-		return (!cnt) ? true : false; }
+	bool isEmpty(void) const;
 
 	/*!	\brief get fullness state of the queue
 	**	\return cppQueue fullness status
 	**	\retval true if queue is full
 	**	\retval false is not full
 	**/
-	inline bool isFull(void) __attribute__((always_inline)) {
-		return (cnt == rec_nb) ? true : false; }
+	bool isFull(void) const;
 
 	/*!	\brief get size of queue
 	**	\remark Size in bytes (like sizeof)
 	**	\return Size of queue in bytes
 	**/
-	inline uint32_t sizeOf(void) __attribute__((always_inline)) {
-		return queue_sz; }
+	uint32_t sizeOf(void) const;
 
 	/*!	\brief get number of records in the queue
 	**	\return Number of records stored in the queue
 	**/
-	inline uint16_t getCount(void) __attribute__((always_inline)) {
-		return cnt; }
+	uint16_t getCount(void) const;
 
 	/*!	\brief get number of records in the queue (same as getCount)
 	**	\deprecated nbRecs was already used in cppQueue lib, alias is made to keep compatibility with earlier versions
 	**	\return Number of records stored in the queue
 	**/
-	inline uint16_t nbRecs(void) __attribute__((always_inline)) {
+	inline uint16_t nbRecs(void) const __attribute__((always_inline)) {
 		return getCount(); }
 
 	/*!	\brief get number of records left in the queue
 	**	\return Number of records left in the queue
 	**/
-	inline uint16_t getRemainingCount(void) __attribute__((always_inline)) {
-		return rec_nb - cnt; }
+	uint16_t getRemainingCount(void) const;
 
 	/*!	\brief Push record to queue
 	**	\param [in] record - pointer to record to be pushed into queue
@@ -188,9 +188,10 @@ public:
 	**	\retval true if successfully peeked from queue
 	**	\retval false if queue is empty
 	**/
-	inline bool peekPrevious(void * const record) __attribute__((nonnull,always_inline)) {
-		const uint16_t idx = getCount() - 1;	// No worry about count - 1 when queue is empty, test is done by peekIdx
-		return peekIdx(record, idx); }
+	bool peekPrevious(void * const record) __attribute__((nonnull));
 };
 
-#endif /* __CPPQUEUE_H */
+
+/****************************************************************/
+#endif /* CPPQUEUE_H_ */
+/****************************************************************/

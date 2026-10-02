@@ -385,9 +385,18 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
       else
         pkgList[i].audio_level = 0;
       len = strlen(raw);
-      if (len > 500)
-        len = 500;
+      // -1, not 500: leaves room for the null terminator below. Without it
+      // (and without it at all, as this used to be), a slot that previously
+      // held a longer packet keeps that packet's stale tail bytes past the
+      // new, shorter one - handle_lastHeard() (and anything else doing
+      // String(pkg.raw) / strlen(pkg.raw)) then reads past the real comment
+      // into that leftover garbage. See FORK_NOTES.md's "never trust a
+      // packet-derived length as a buffer size" - same bug class, this time
+      // missing the terminator rather than the clamp.
+      if (len > sizeof(pkgList[i].raw) - 1)
+        len = sizeof(pkgList[i].raw) - 1;
       memcpy(pkgList[i].raw, raw, len);
+      pkgList[i].raw[len] = 0;
       // SerialLOG.print("Update: ");
     }
   }
@@ -411,9 +420,10 @@ int pkgListUpdate(char *call, char *raw, uint16_t type, bool channel)
     // strcpy(pkgList[i].calsign, callsign);
     memcpy(pkgList[i].calsign, callsign, strlen(callsign));
     len = strlen(raw);
-    if (len > 500)
-      len = 500;
+    if (len > sizeof(pkgList[i].raw) - 1)
+      len = sizeof(pkgList[i].raw) - 1;
     memcpy(pkgList[i].raw, raw, len);
+    pkgList[i].raw[len] = 0;
     // strcpy(pkgList[i].raw, raw);
     pkgList[i].calsign[10] = 0;
     // SerialLOG.print("NEW: ");
@@ -622,7 +632,12 @@ int packet2Raw(String &tnc2, AX25Msg &Packet)
       tnc2 += "*";
   }
   tnc2 += String(F(":"));
-  tnc2 += String((const char *)Packet.info);
+  // Packet.info is a length-prefixed byte buffer (Packet.len), not a
+  // null-terminated C string - APRS payloads can legitimately contain
+  // embedded NUL bytes (e.g. some Kenwood TM-D710 power-on packets, UTF-16
+  // from AGWtracker). String((const char*)) calls strlen() internally and
+  // silently truncates at the first one; concat(cstr, length) doesn't.
+  tnc2.concat((const char *)Packet.info, Packet.len);
 
   return tnc2.length();
 }

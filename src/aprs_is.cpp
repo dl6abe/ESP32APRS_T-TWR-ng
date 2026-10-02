@@ -69,7 +69,7 @@ void sendDeviceInfo()
     xSemaphoreGive(aprsClientMutex);
     return;
   }
-  String status = "DL6ABE>" APRS_TOCALL ":>Device: DL6ABE: ESP32APRS T-TWR+ iGate/Digi/Tracker V" + String(VERSION) + String(VERSION_BUILD);
+  String status = "DL6ABE>" APRS_TOCALL ":>Device: DL6ABE: ESP32APRS T-TWR+ iGate/Digi/Tracker v" + String(VERSION) + String(VERSION_BUILD);
   size_t wrote = aprsClient.println(status);
   IPAddress remoteIp = aprsClient.remoteIP();
   xSemaphoreGive(aprsClientMutex);
